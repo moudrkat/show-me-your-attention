@@ -45,15 +45,21 @@ class AttentionExtractor:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 output_attentions=True,
-                output_hidden_states=True
-            ).to(self.device)
+                output_hidden_states=True,
+                torch_dtype=torch.float32,
+                low_cpu_mem_usage=True
+            )
+            self.model = self.model.to(self.device)
         else:
             print("Detected: Bidirectional (masked) model")
             self.model = AutoModel.from_pretrained(
                 model_name,
                 output_attentions=True,
-                output_hidden_states=True
-            ).to(self.device)
+                output_hidden_states=True,
+                torch_dtype=torch.float32,
+                low_cpu_mem_usage=True
+            )
+            self.model = self.model.to(self.device)
 
         self.model.eval()
 
