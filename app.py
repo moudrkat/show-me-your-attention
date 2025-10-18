@@ -363,7 +363,10 @@ with tab1:
 
             $$V_i^{(\\ell,h)} = W_V^{(\\ell,h)} \\cdot h_i$$
 
-            where $W_Q, W_K, W_V$ are learned projection matrices, and $h_i \\in \\mathbb{R}^{d_{\\text{model}}}$
+            where:
+            - $h_i$ = hidden state (vector representation of token $i$ at this layer)
+            - $W_Q, W_K, W_V$ = learned projection matrices
+            - $h_i \\in \\mathbb{R}^{d_{\\text{model}}}$ (256-dim for 8M, 1024-dim for 1Layer-21M)
             """)
 
             st.markdown("""
