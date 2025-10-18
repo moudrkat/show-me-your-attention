@@ -7,6 +7,7 @@ import streamlit as st
 import sys
 import os
 import numpy as np
+import torch
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -40,7 +41,8 @@ if 'qkv_data' not in st.session_state:
     st.session_state.qkv_data = None
 
 # Title and description
-st.title("Show Me Your Attention (at least once upon a time...)")
+st.title("Show Me Your Attention")
+st.header("(...at least once upon a time.)")
 st.markdown("""
 Welcome to a place where you can generate fairytales and observe attention mechanism at the same time. Fancy matrices included!
 """)
@@ -79,17 +81,17 @@ show_probabilities = True  # Always show token probabilities
 tab1, tab2 = st.tabs(["📝 Analysis", "🤖 Model Info"])
 
 with tab1:
-    st.header("Attention Analysis During Generation")
 
     # What this app does and how it works section
     with st.expander("📚 About & How to Use", expanded=False):
         st.markdown("""
         ### What This App Does
 
-        This tool analyzes **attention patterns during text generation**. It provides two complementary views:
+        This tool analyzes **attention patterns during text generation**. It provides three complementary views:
 
         1. **Generation Attention**: How each newly generated token attends back to the original prompt
-        2. **Self-Attention**: How prompt tokens attend to each other, revealing the internal attention mechanism
+        2. **Self-Attention (Q, K, V)**: How prompt tokens attend to each other, revealing the internal attention mechanism with detailed mathematical breakdown
+        3. **Complete Attention Matrix**: Full self-attention matrix showing how all tokens (prompt + generated) attend to each other in one comprehensive heatmap
 
         ---
 
@@ -98,6 +100,9 @@ with tab1:
         1. **Enter a prompt**: Type any text (e.g., "The cat is") or select an example
         2. **Generate text**: Click "Generate & Visualize" - the model continues your prompt
         3. **Explore visualizations**:
+           - Generation attention bars (how generated words look back at prompt)
+           - Q, K, V matrices (internal attention mechanics)
+           - Complete attention matrix (the big picture!)
 
         """)
 
@@ -127,27 +132,8 @@ with tab1:
         help="Enter a prompt to generate from"
     )
 
-    # Layer selection for generation
-    st.subheader("Attention Layer Selection")
-    layer_options = {
-        "Last layer only (Layer 7)": "last",
-        "Average across all layers": "average",
-        "Layer 0 (Earliest)": "layer_0",
-        "Layer 1": "layer_1",
-        "Layer 2": "layer_2",
-        "Layer 3": "layer_3",
-        "Layer 4": "layer_4",
-        "Layer 5": "layer_5",
-        "Layer 6": "layer_6",
-        "Layer 7 (Last)": "layer_7"
-    }
-    layer_selection = st.selectbox(
-        "Which layer(s) to analyze",
-        options=list(layer_options.keys()),
-        index=0,  # Default to "Last layer only"
-        help="Choose which attention layer(s) to use for visualization. Last layer is most relevant for generation decisions."
-    )
-    layer_mode = layer_options[layer_selection]
+    # Use last layer by default for generation
+    layer_mode = "last"
 
     if st.button("🚀 Generate & Visualize", type="primary"):
         if not prompt:
@@ -215,6 +201,27 @@ with tab1:
             - Color = relative attention (darker = stronger within that subplot)
             """)
 
+        # Layer selection for generation attention
+        layer_options = {
+            "Last layer only (Layer 7)": "last",
+            "Average across all layers": "average",
+            "Layer 0 (Earliest)": "layer_0",
+            "Layer 1": "layer_1",
+            "Layer 2": "layer_2",
+            "Layer 3": "layer_3",
+            "Layer 4": "layer_4",
+            "Layer 5": "layer_5",
+            "Layer 6": "layer_6",
+            "Layer 7 (Last)": "layer_7"
+        }
+        layer_selection_display = st.selectbox(
+            "Which layer(s) to analyze",
+            options=list(layer_options.keys()),
+            index=0,  # Default to "Last layer only"
+            help="Choose which attention layer(s) to visualize. Note: This was used during generation.",
+            key="gen_layer_display"
+        )
+
         st.markdown("""
         **Attention Calculation:**
 
@@ -225,7 +232,7 @@ with tab1:
         where $L$ = layers, $H$ = heads per layer, $d_k$ = head dimension
         """)
 
-        st.info("📊 **Token probabilities** shown on x-axis indicate how confident the model was when generating each token (higher = more certain).")
+        st.markdown("(**Token probabilities** shown on x-axis indicate how confident the model was when generating each token (higher = more certain).)")
 
         # Create and display visualization
         fig = plt.figure(figsize=(fig_width, fig_height))
@@ -389,13 +396,132 @@ with tab1:
                 st.image(buf_qkv, use_container_width=True)
                 plt.close()
 
+        # Full Attention Matrix Section
+        st.markdown("---")
+        st.header("🌐 Complete Attention Matrix")
+
+        with st.expander("📖 What does this show?", expanded=False):
+            st.markdown("""
+            ### Full Self-Attention: All Tokens → All Tokens
+
+            **What it shows:** Complete attention matrix showing how every token (both prompt and generated) attends to every other token.
+
+            **Dimensions:** `[total_tokens × total_tokens]` where total_tokens = prompt_tokens + generated_tokens
+
+            **Purpose:** See the complete picture of how the entire sequence attends to itself during generation.
+
+            **Reading the matrix:**
+            - **Rows**: Query tokens (what's attending)
+            - **Columns**: Key tokens (what's being attended to)
+            - **Upper-left quadrant**: Prompt attending to prompt (self-attention)
+            - **Upper-right quadrant**: Prompt attending to generated tokens (impossible due to causal masking - will be zero)
+            - **Lower-left quadrant**: Generated tokens attending to prompt
+            - **Lower-right quadrant**: Generated tokens attending to each other
+            - **Diagonal line**: Each token attending to itself
+
+            **Note:** Due to causal (autoregressive) masking, tokens can only attend to previous tokens, creating a triangular pattern.
+            """)
+
+        with st.expander("🔬 View Full Attention Matrix", expanded=True):
+            # Get full sequence tokens
+            all_tokens = result['prompt_tokens'] + result['generated_tokens']
+            n_prompt = len(result['prompt_tokens'])
+            n_generated = len(result['generated_tokens'])
+            n_total = n_prompt + n_generated
+
+            st.markdown(f"""
+            **Matrix Information:**
+            - Total tokens: {n_total} ({n_prompt} prompt + {n_generated} generated)
+            - Matrix size: {n_total} × {n_total}
+            - Prompt tokens: positions 0-{n_prompt-1}
+            - Generated tokens: positions {n_prompt}-{n_total-1}
+            """)
+
+            # Layer selection for full matrix
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                full_matrix_layer = st.selectbox(
+                    "Select layer for full attention matrix",
+                    options=list(range(8)),
+                    index=7,
+                    help="Which layer to visualize the complete attention matrix",
+                    key="full_matrix_layer"
+                )
+
+            with st.spinner("Computing full attention matrix..."):
+                try:
+                    # Re-run the full sequence through the model to get complete attention
+                    full_text = prompt + result['generated_text'][len(prompt):]
+                    inputs = st.session_state.extractor.tokenizer(full_text, return_tensors="pt")
+                    inputs = {k: v.to(st.session_state.extractor.device) for k, v in inputs.items()}
+
+                    with torch.no_grad():
+                        outputs = st.session_state.extractor.model(**inputs)
+
+                    # Get attention from specified layer
+                    # Shape: [batch, num_heads, seq_len, seq_len]
+                    layer_attention = outputs.attentions[full_matrix_layer][0]  # Remove batch dim
+
+                    # Average across all heads
+                    full_attention_matrix = layer_attention.mean(dim=0).cpu().numpy()
+
+                    # Create visualization
+                    fig, ax = plt.subplots(figsize=(16, 14))
+
+                    # Plot heatmap
+                    im = ax.imshow(full_attention_matrix, cmap='viridis', aspect='auto', interpolation='nearest')
+
+                    # Add colorbar
+                    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                    cbar.set_label('Attention Weight', fontsize=12, weight='bold')
+
+                    # Set ticks and labels
+                    ax.set_xticks(range(n_total))
+                    ax.set_yticks(range(n_total))
+                    ax.set_xticklabels(all_tokens, rotation=90, ha='right', fontsize=8)
+                    ax.set_yticklabels(all_tokens, fontsize=8)
+
+                    # Remove grid lines
+                    ax.grid(False)
+
+                    # Add dividing lines to separate prompt from generated (not crossing lines)
+                    ax.axhline(y=n_prompt-0.5, color='red', linewidth=2, linestyle='--', alpha=0.7)
+                    ax.axvline(x=n_prompt-0.5, color='red', linewidth=2, linestyle='--', alpha=0.7)
+
+                    # Add labels for quadrants
+                    ax.text(n_prompt/2, -1.5, 'PROMPT', ha='center', va='bottom',
+                           fontsize=11, weight='bold', color='darkblue')
+                    ax.text(n_prompt + n_generated/2, -1.5, 'GENERATED', ha='center', va='bottom',
+                           fontsize=11, weight='bold', color='darkgreen')
+                    ax.text(-1.5, n_prompt/2, 'PROMPT', ha='right', va='center', rotation=90,
+                           fontsize=11, weight='bold', color='darkblue')
+                    ax.text(-1.5, n_prompt + n_generated/2, 'GENERATED', ha='right', va='center', rotation=90,
+                           fontsize=11, weight='bold', color='darkgreen')
+
+                    ax.set_title(f'Complete Attention Matrix - Layer {full_matrix_layer}\n(Averaged across all {layer_attention.shape[0]} heads)',
+                               fontsize=14, weight='bold', pad=20)
+                    ax.set_xlabel('Key Tokens (attending TO)', fontsize=12, weight='bold')
+                    ax.set_ylabel('Query Tokens (attending FROM)', fontsize=12, weight='bold')
+
+                    plt.tight_layout()
+
+                    # Display
+                    buf_full = io.BytesIO()
+                    plt.savefig(buf_full, format='png', dpi=150, bbox_inches='tight')
+                    buf_full.seek(0)
+                    st.image(buf_full, use_container_width=True)
+                    plt.close()
+
+                except Exception as e:
+                    st.error(f"Error generating full attention matrix: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+
 with tab2:
-    st.header("About TinyStories-8M Model")
 
     st.markdown("""
 
     **TinyStories-8M** is a small language model trained on simple children's stories.
-    It's fast and perfect for educational exploration of attention mechanisms!
 
     #### Architecture Specifications
 
@@ -438,12 +564,7 @@ with tab2:
     #### Training Details
 
     The TinyStories models were trained on a synthetic dataset of simple children's stories
-    generated to contain only words that a typical 3-4 year old would understand. This makes
-    the model:
-    - **Fast to run:** Small size enables real-time inference even on CPU
-    - **Interpretable:** Simple vocabulary and grammar patterns
-    - **Educational:** Perfect for understanding transformer mechanics
-    - **Coherent:** Generates grammatically correct simple sentences
+    generated to contain only words that a typical 3-4 year old would understand. 
 
     #### Attention Mechanism Details
 
