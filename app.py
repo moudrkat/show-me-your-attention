@@ -549,11 +549,11 @@ with tab1:
                     # Add labels for quadrants
                     ax.text(n_prompt/2, -1.5, 'PROMPT', ha='center', va='bottom',
                            fontsize=11, weight='bold', color='darkblue')
-                    ax.text(n_prompt + n_generated/2, -1.5, 'GENERATED', ha='center', va='bottom',
+                    ax.text(n_prompt + n_generated/2 - n_generated*0.3, -1.5, 'GENERATED', ha='center', va='bottom',
                            fontsize=11, weight='bold', color='darkgreen')
                     ax.text(-1.5, n_prompt/2, 'PROMPT', ha='right', va='center', rotation=90,
                            fontsize=11, weight='bold', color='darkblue')
-                    ax.text(-1.5, n_prompt + n_generated/2, 'GENERATED', ha='right', va='center', rotation=90,
+                    ax.text(-1.5, n_prompt + n_generated/2 + n_generated*0.2, 'GENERATED', ha='right', va='center', rotation=90,
                            fontsize=11, weight='bold', color='darkgreen')
 
                     ax.set_title(f'Complete Attention Matrix - Layer {full_matrix_layer}\n(Averaged across all {layer_attention.shape[0]} heads)',

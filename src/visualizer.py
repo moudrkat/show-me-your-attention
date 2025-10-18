@@ -1286,10 +1286,11 @@ class AttentionVisualizer:
         import matplotlib.gridspec as gridspec
         # Row 1: Q × K^T → Scores → Softmax → Attention
         # Row 2: Attention × V → Output
-        gs = gridspec.GridSpec(3, 7, figure=fig,
+        gs = gridspec.GridSpec(4, 7, figure=fig,
                               width_ratios=[1, 0.15, 1, 0.15, 1, 0.15, 1],
-                              height_ratios=[1, 0.8, 0.1],
-                              hspace=0.5, wspace=0.4)
+                              height_ratios=[1, 0.15, 0.8, 0.15],
+                              hspace=0.3, wspace=0.4,
+                              top=0.88)
 
         # Top row: Q, K, V matrices with multiplication symbols
         # Plot Q matrix
@@ -1371,13 +1372,13 @@ class AttentionVisualizer:
         ax_attn.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
         ax_attn.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
         # Add shape annotation
-        ax_attn.text(0.5, -0.25, f'Shape: [{len(tokens)} × {len(tokens)}]',
+        ax_attn.text(0.5, -0.30, f'Shape: [{len(tokens)} × {len(tokens)}]',
                     transform=ax_attn.transAxes, ha='center', fontsize=8,
                     style='italic', color='darkorange')
 
         # Second row: Show Attention × V → Output
         # Plot Attention weights (same as above, for the multiplication)
-        ax_attn2 = fig.add_subplot(gs[1, 0])
+        ax_attn2 = fig.add_subplot(gs[2, 0])
         im_attn2 = ax_attn2.imshow(attention, aspect='auto', cmap='YlOrRd', interpolation='nearest')
         ax_attn2.set_title('Attention\nWeights', fontsize=11, weight='bold', color='darkorange')
         ax_attn2.set_xlabel('Key Token', fontsize=9)
@@ -1392,7 +1393,7 @@ class AttentionVisualizer:
         fig.colorbar(im_attn2, ax=ax_attn2, fraction=0.046, pad=0.04)
 
         # Multiplication symbol between Attention and V
-        ax_mult2 = fig.add_subplot(gs[1, 1])
+        ax_mult2 = fig.add_subplot(gs[2, 1])
         ax_mult2.axis('off')
         ax_mult2.text(0.5, 0.5, '×', fontsize=40, ha='center', va='center',
                      weight='bold', color='darkred')
@@ -1400,7 +1401,7 @@ class AttentionVisualizer:
                      style='italic', color='gray')
 
         # Plot V matrix
-        ax_v = fig.add_subplot(gs[1, 2])
+        ax_v = fig.add_subplot(gs[2, 2])
         im_v = ax_v.imshow(V, aspect='auto', cmap='Purples', interpolation='nearest')
         ax_v.set_title('Value (V)\n"What to carry"', fontsize=11, weight='bold', color='purple')
         ax_v.set_xlabel(f'Dimension (d={head_dim})', fontsize=9)
@@ -1413,7 +1414,7 @@ class AttentionVisualizer:
         fig.colorbar(im_v, ax=ax_v, fraction=0.046, pad=0.04)
 
         # Equals/Arrow symbol
-        ax_arrow3 = fig.add_subplot(gs[1, 3])
+        ax_arrow3 = fig.add_subplot(gs[2, 3])
         ax_arrow3.axis('off')
         ax_arrow3.text(0.5, 0.5, '=', fontsize=40, ha='center', va='center',
                       weight='bold', color='darkgreen')
@@ -1422,7 +1423,7 @@ class AttentionVisualizer:
 
         # Compute and plot output (Attention @ V)
         output = np.matmul(attention, V)
-        ax_output = fig.add_subplot(gs[1, 4])
+        ax_output = fig.add_subplot(gs[2, 4])
         im_output = ax_output.imshow(output, aspect='auto', cmap='viridis', interpolation='nearest')
         ax_output.set_title('Output\n(Attention @ V)', fontsize=11, weight='bold', color='darkgreen')
         ax_output.set_xlabel(f'Dimension (d={head_dim})', fontsize=9)
@@ -1435,7 +1436,7 @@ class AttentionVisualizer:
         fig.colorbar(im_output, ax=ax_output, fraction=0.046, pad=0.04)
 
         # Bottom row: Summary text
-        ax_summary = fig.add_subplot(gs[2, :])
+        ax_summary = fig.add_subplot(gs[3, :])
         ax_summary.axis('off')
         summary_text = (
             'Complete Attention Flow: Q·K^T/√d → softmax → Attention Weights → Attention·V → Final Output'
