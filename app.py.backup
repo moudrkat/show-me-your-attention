@@ -1,0 +1,434 @@
+"""
+Streamlit app for analyzing attention patterns during text generation.
+Shows how each generated token attends to ALL tokens in the prompt.
+"""
+
+import streamlit as st
+import sys
+import os
+import numpy as np
+
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
+from model_loader import AttentionExtractor
+from visualizer import AttentionVisualizer
+import matplotlib.pyplot as plt
+import io
+
+# Set page config
+st.set_page_config(
+    page_title="Show Me Your Attention",
+    page_icon="🔍",
+    layout="wide"
+)
+
+# Initialize session state
+if 'extractor' not in st.session_state:
+    st.session_state.extractor = None
+
+if 'viz' not in st.session_state:
+    st.session_state.viz = AttentionVisualizer()
+
+if 'generation_result' not in st.session_state:
+    st.session_state.generation_result = None
+
+if 'current_prompt' not in st.session_state:
+    st.session_state.current_prompt = None
+
+# Title and description
+st.title("🔍 Show Me Your Attention")
+st.markdown("""
+Explore how each generated word attends to every word in your prompt.
+
+**Visualization:** See separate plots for each generated word showing its attention distribution across the prompt.
+""")
+
+# Sidebar for configuration
+st.sidebar.header("⚙️ Configuration")
+
+# Model selection - TinyStories 8M only
+model_name = "roneneldan/TinyStories-8M"
+st.sidebar.info(f"**Model:** {model_name}")
+
+# Load model button
+if st.sidebar.button("🚀 Load Model") or st.session_state.extractor is None:
+    if model_name:
+        with st.spinner(f"Loading {model_name}..."):
+            try:
+                st.session_state.extractor = AttentionExtractor(model_name=model_name)
+                st.sidebar.success(f"✅ Loaded {model_name}")
+            except Exception as e:
+                st.sidebar.error(f"❌ Failed to load model: {str(e)}")
+                st.session_state.extractor = None
+    else:
+        st.sidebar.error("Please select a model")
+
+# Generation parameters
+st.sidebar.header("🎛️ Generation Settings")
+max_tokens = st.sidebar.slider("Max tokens to generate", 5, 30, 12, help="Number of tokens to generate (fewer = cleaner visualization)")
+temperature = st.sidebar.slider("Temperature", 0.1, 2.0, 1.0, 0.1)
+
+# Visualization settings
+st.sidebar.header("📊 Visualization Settings")
+fig_width = st.sidebar.slider("Figure width", 12, 24, 18)
+fig_height = st.sidebar.slider("Figure height", 8, 20, 12)
+show_probabilities = st.sidebar.checkbox("Show token probabilities", value=True, help="Display probability values for each generated token")
+
+# Attention layer selection
+st.sidebar.header("🔍 Attention Analysis")
+layer_options = {
+    "Last layer only (Layer 7)": "last",
+    "Average across all layers": "average",
+    "Layer 0 (Earliest)": "layer_0",
+    "Layer 1": "layer_1",
+    "Layer 2": "layer_2",
+    "Layer 3": "layer_3",
+    "Layer 4": "layer_4",
+    "Layer 5": "layer_5",
+    "Layer 6": "layer_6",
+    "Layer 7 (Last)": "layer_7"
+}
+layer_selection = st.sidebar.selectbox(
+    "Which layer(s) to analyze",
+    options=list(layer_options.keys()),
+    index=0,  # Default to "Last layer only"
+    help="Choose which attention layer(s) to use for visualization. Last layer is most relevant for generation decisions."
+)
+layer_mode = layer_options[layer_selection]
+
+# Main content
+tab1, tab2 = st.tabs(["📝 Analysis", "ℹ️ About"])
+
+with tab1:
+    st.header("Attention Analysis During Generation")
+
+    st.subheader("Enter Your Prompt")
+
+    # Example prompts
+    example = st.selectbox(
+        "Load Example",
+        [
+            "Custom",
+            "The cat is",
+            "Once upon a time",
+            "A little girl named",
+            "The dragon was very",
+            "In the forest there"
+        ]
+    )
+
+    if example != "Custom":
+        default_prompt = example
+    else:
+        default_prompt = ""
+
+    prompt = st.text_input(
+        "Prompt",
+        value=default_prompt,
+        help="Enter a prompt to generate from"
+    )
+
+    if st.button("🚀 Generate & Visualize", type="primary"):
+        if not prompt:
+            st.error("Please enter a prompt")
+        elif st.session_state.extractor is None:
+            st.error("Please load a model first (use sidebar)")
+        else:
+            with st.spinner("Generating text and analyzing attention..."):
+                try:
+        # Generate text with attention tracking to all prompt tokens
+        result = st.session_state.extractor.generate_with_attention_to_all_prompt_tokens(
+            prompt=prompt,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            layer_mode=layer_mode
+        )
+
+        # Store in session state
+        st.session_state.generation_result = result
+        st.session_state.current_prompt = prompt
+
+        st.success("✅ Generation complete!")
+
+                except Exception as e:
+        st.error(f"Error during generation: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+
+    # Display results if they exist in session state
+    if st.session_state.generation_result is not None:
+        result = st.session_state.generation_result
+        prompt = st.session_state.current_prompt
+
+        # Display results
+        st.header("📊 Results")
+
+        # Show prompt
+        st.markdown("**Original Prompt:**")
+        st.info(prompt)
+
+        # Show generated text
+        st.markdown("**Generated Text:**")
+        st.success(result['generated_text'])
+
+        # Show token breakdown
+        with st.expander("🔤 Token Breakdown"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Prompt Tokens:**")
+                st.code(result['prompt_tokens'])
+            with col2:
+                st.markdown("**Generated Tokens (with probabilities):**")
+                if 'token_probabilities' in result:
+                    token_info = [f"{i}: {tok} (p={prob:.4f})"
+                                for i, (tok, prob) in enumerate(zip(result['generated_tokens'],
+                                                                    result['token_probabilities']))]
+                    st.code('\n'.join(token_info))
+                else:
+                    st.code(result['generated_tokens'])
+
+        # Show main visualization
+        st.header("🎯 Attention Visualization")
+        st.markdown(f"""
+        Each subplot shows one prompt word and how much attention it receives from each generated word.
+        - **X-axis**: Generated tokens (in order)
+        - **Bar height** = attention strength
+        - **Color** = relative attention (darker = stronger within that subplot)
+        - **Analyzing**: {layer_selection}
+        """)
+
+        # Create and display visualization
+        fig = plt.figure(figsize=(fig_width, fig_height))
+        st.session_state.viz.plot_generated_attention_to_all_prompt_tokens(
+            generation_result=result,
+            save_path=None,
+            figsize=(fig_width, fig_height),
+            show_probabilities=show_probabilities
+        )
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        buf.seek(0)
+        st.image(buf, use_container_width=True)
+        plt.close()
+
+        # Show attention matrix
+        with st.expander("📊 Attention Matrix (Raw Values)"):
+            st.markdown("**Rows:** Generated tokens | **Columns:** Prompt tokens")
+
+            # Create attention matrix
+            attention_matrix = np.array(result['attention_to_prompt'])
+
+            # Display as dataframe
+            import pandas as pd
+            df = pd.DataFrame(
+                attention_matrix,
+                index=[f"Gen[{i}]: {tok}" for i, tok in enumerate(result['generated_tokens'])],
+                columns=result['prompt_tokens']
+            )
+            st.dataframe(df.style.background_gradient(cmap='viridis', axis=1), use_container_width=True)
+
+        # Download option
+        st.markdown("---")
+        st.markdown("**💾 Download Visualization**")
+
+        # Create download button
+        fig_download = plt.figure(figsize=(fig_width, fig_height))
+        st.session_state.viz.plot_generated_attention_to_all_prompt_tokens(
+            generation_result=result,
+            save_path=None,
+            figsize=(fig_width, fig_height),
+            show_probabilities=show_probabilities
+        )
+        buf_download = io.BytesIO()
+        plt.savefig(buf_download, format='png', dpi=300, bbox_inches='tight')
+        buf_download.seek(0)
+        plt.close()
+
+        st.download_button(
+            label="Download PNG (High Resolution)",
+            data=buf_download,
+            file_name=f"attention_{prompt.replace(' ', '_')[:20]}.png",
+            mime="image/png"
+        )
+
+        # Q, K, V Visualization Section
+        st.markdown("---")
+        st.header("🔬 Query, Key, Value Matrices")
+        st.markdown("""
+        Explore the raw Q, K, V matrices that form the foundation of attention.
+        - **Query (Q)**: What each token is "looking for"
+        - **Key (K)**: What each token "contains"
+        - **Value (V)**: What information each token "carries"
+        """)
+
+        with st.expander("📊 View Q, K, V Matrices", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                qkv_layer = st.selectbox(
+                    "Select layer for Q/K/V",
+                    options=list(range(8)),
+                    index=7,
+                    help="Which layer to extract Q, K, V from"
+                )
+            with col2:
+                qkv_head = st.slider(
+                    "Select attention head",
+                    min_value=0,
+                    max_value=15,
+                    value=0,
+                    help="Which attention head to visualize (0-15)"
+                )
+
+            if st.button("🚀 Extract & Visualize Q, K, V"):
+                with st.spinner("Extracting Q, K, V matrices..."):
+                    try:
+                        # Extract Q, K, V for the prompt
+                        qkv_data = st.session_state.extractor.extract_qkv_matrices(
+                            prompt=prompt,
+                            layer_idx=qkv_layer
+                        )
+
+                        st.success(f"✅ Extracted Q, K, V from Layer {qkv_layer}")
+
+                        # Show info
+                        st.markdown(f"""
+                        **Matrix Dimensions:**
+                        - Number of tokens: {len(qkv_data['tokens'])}
+                        - Number of heads: {qkv_data['num_heads']}
+                        - Head dimension: {qkv_data['head_dim']}
+                        - Each matrix shape: [{qkv_data['num_heads']}, {len(qkv_data['tokens'])}, {qkv_data['head_dim']}]
+                        """)
+
+                        # Visualize Q, K, V for selected head
+                        st.subheader(f"Q, K, V for Head {qkv_head}")
+                        fig_qkv = plt.figure(figsize=(18, 6))
+                        st.session_state.viz.plot_qkv_matrices(
+                            qkv_data=qkv_data,
+                            head_idx=qkv_head
+                        )
+                        buf_qkv = io.BytesIO()
+                        plt.savefig(buf_qkv, format='png', dpi=150, bbox_inches='tight')
+                        buf_qkv.seek(0)
+                        st.image(buf_qkv, use_container_width=True)
+                        plt.close()
+
+                        # Option to view all heads for one matrix type
+                        st.subheader("All Heads Comparison")
+                        matrix_type = st.selectbox(
+                            "Select matrix type to compare across all heads",
+                            options=["Q", "K", "V"],
+                            help="View one type of matrix across all 16 attention heads"
+                        )
+
+                        if st.button(f"Show {matrix_type} across all heads"):
+                            fig_all = plt.figure(figsize=(20, 12))
+                            st.session_state.viz.plot_qkv_all_heads(
+                                qkv_data=qkv_data,
+                                matrix_type=matrix_type
+                            )
+                            buf_all = io.BytesIO()
+                            plt.savefig(buf_all, format='png', dpi=150, bbox_inches='tight')
+                            buf_all.seek(0)
+                            st.image(buf_all, use_container_width=True)
+                            plt.close()
+
+                    except Exception as e:
+                        st.error(f"Error extracting Q, K, V: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
+
+                except Exception as e:
+        st.error(f"Error during generation: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+
+with tab2:
+    st.header("About This App")
+
+    st.markdown("""
+
+    ### What This App Does
+
+    This tool analyzes **attention patterns during text generation**. Unlike traditional attention visualizations
+    that focus on a single word, this shows how **each generated token** attends to **all words** in the prompt.
+
+    ### How It Works
+
+    1. **Enter a prompt**: Type any text (e.g., "The cat is")
+    2. **Generate text**: The model continues your prompt
+    3. **Visualize attention**: See separate plots for each generated word
+    4. **Analyze patterns**: Understand which prompt words influence each generated word
+
+    ---
+
+    ### Understanding the Visualization
+
+    The visualization creates **one subplot per prompt token** (stacked vertically), showing:
+
+    - **Title**: Each subplot is labeled with one prompt token
+    - **X-axis**: All generated tokens (in order)
+    - **Y-axis**: Attention score
+    - **Bars**: Height indicates how much each generated token attends to that prompt token
+    - **Colors**: Relative strength within each subplot (darker = stronger)
+
+    **Example:**
+    ```
+    Prompt: "The cat is"
+    Generated: "sleeping on the floor"
+
+    You'll see 3 subplots (one per prompt word):
+    1. "The" ← attention from [sleeping, on, the, floor]
+    2. "cat" ← attention from [sleeping, on, the, floor]
+    3. "is" ← attention from [sleeping, on, the, floor]
+    ```
+
+    This layout makes it easy to see which generated words pay most attention to each specific prompt word.
+
+    ---
+
+    ### Attention Calculation
+
+    For each generated token $g_i$ and each prompt token $p_j$:
+
+    $$A_{g_i \\to p_j} = \\frac{1}{L \\times H} \sum_{\\ell=1}^{L} \sum_{h=1}^{H} A_{i,j}^{(\\ell, h)}$$
+
+    where:
+    - $L$ = number of layers
+    - $H$ = number of attention heads
+    - $A_{i,j}^{(\\ell, h)}$ = attention weight from token $i$ to token $j$ in layer $\\ell$, head $h$
+
+    ---
+
+    ### Technical Details
+
+    - **Model**: TinyStories-8M (8 million parameters)
+    - **Architecture**: Causal GPT-2 style transformer
+    - **Attention extraction**: Averaged across all layers and heads
+    - **Computation**: Token-by-token generation with attention tracking
+
+    ### Tips for Best Results
+
+    1. **Short prompts** (3-6 words) are easier to visualize
+    2. **Fewer tokens** (5-15) keep the visualization clean
+    3. **Lower temperature** (0.7-1.0) produces more consistent results
+    4. **Adjust figure size** in sidebar for better readability
+
+    ---
+
+    ### What You Can Learn
+
+    - **Positional bias**: Do later tokens attend more to recent prompt words?
+    - **Content words**: Which types of words (nouns, verbs) get most attention?
+    - **Attention decay**: Does attention to prompt fade as generation continues?
+    - **Patterns**: Are there consistent attention patterns across generations?
+
+    ---
+
+    ### Model Information
+
+    **TinyStories-8M** is a small language model with 8 million parameters, trained on simple children's stories.
+    It's fast and perfect for educational exploration of attention mechanisms!
+
+    """)

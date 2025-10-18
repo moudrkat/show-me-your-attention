@@ -1,0 +1,19 @@
+# Training dependencies for fine-tuning TinyStories models
+# Install with: pip install -r requirements-training.txt
+
+# Core dependencies (also in main requirements.txt)
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+
+# Training-specific
+datasets>=2.14.0         # HuggingFace datasets library
+accelerate>=0.20.0       # Multi-GPU training and optimization
+evaluate>=0.4.0          # Model evaluation metrics
+
+# Optional: Parameter-efficient fine-tuning
+peft>=0.4.0              # LoRA and other PEFT methods
+
+# Optional: Experiment tracking
+# wandb>=0.15.0          # Weights & Biases logging
+# tensorboard>=2.13.0    # TensorBoard logging
