@@ -29,6 +29,20 @@ class AttentionVisualizer:
             # Fallback if style not available
             pass
 
+    @staticmethod
+    def clean_token(token: str) -> str:
+        """
+        Clean token by removing GPT-2 tokenization artifacts.
+
+        Args:
+            token: Raw token string
+
+        Returns:
+            Cleaned token string
+        """
+        # Remove Ġ which represents space in GPT-2 tokenization
+        return token.replace('Ġ', ' ').strip()
+
         self.colors = sns.color_palette("husl", 12)
 
     def plot_attention_heatmap(
@@ -695,7 +709,9 @@ class AttentionVisualizer:
                 normalized = score / max_score if max_score > 0 else 0
                 bar.set_color(plt.cm.viridis(normalized))
 
-            ax.set_title(f'Prompt Token: "{prompt_token}"', fontsize=11, weight='bold', loc='left')
+            # Clean token display (remove Ġ which represents space in GPT-2 tokenization)
+            clean_token = prompt_token.replace('Ġ', ' ').strip()
+            ax.set_title(f'Prompt Token: "{clean_token}"', fontsize=11, weight='bold', loc='left')
             ax.set_ylabel('Attention', fontsize=9)
             ax.set_xticks(x)
 
@@ -1283,7 +1299,7 @@ class AttentionVisualizer:
         ax_q.set_xlabel(f'Dimension (d={head_dim})', fontsize=9)
         ax_q.set_ylabel('Token', fontsize=9)
         ax_q.set_yticks(range(len(tokens)))
-        ax_q.set_yticklabels(tokens, fontsize=8)
+        ax_q.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
         # Add shape annotation
         ax_q.text(0.5, -0.15, f'Shape: [{len(tokens)} × {head_dim}]',
                  transform=ax_q.transAxes, ha='center', fontsize=8,
@@ -1304,7 +1320,7 @@ class AttentionVisualizer:
         ax_k.set_xlabel('Token', fontsize=9)
         ax_k.set_ylabel(f'Dimension (d={head_dim})', fontsize=9)
         ax_k.set_xticks(range(len(tokens)))
-        ax_k.set_xticklabels(tokens, fontsize=8, rotation=45, ha='right')
+        ax_k.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=8, rotation=45, ha='right')
         # Add shape annotation
         ax_k.text(0.5, -0.25, f'Shape: [{head_dim} × {len(tokens)}]',
                  transform=ax_k.transAxes, ha='center', fontsize=8,
@@ -1327,8 +1343,8 @@ class AttentionVisualizer:
         ax_scores.set_ylabel('Query Token', fontsize=9)
         ax_scores.set_xticks(range(len(tokens)))
         ax_scores.set_yticks(range(len(tokens)))
-        ax_scores.set_xticklabels(tokens, fontsize=7, rotation=45, ha='right')
-        ax_scores.set_yticklabels(tokens, fontsize=7)
+        ax_scores.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
+        ax_scores.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
         # Add shape annotation
         ax_scores.text(0.5, -0.25, f'Shape: [{len(tokens)} × {len(tokens)}]',
                       transform=ax_scores.transAxes, ha='center', fontsize=8,
@@ -1352,8 +1368,8 @@ class AttentionVisualizer:
         ax_attn.set_ylabel('Query Token', fontsize=9)
         ax_attn.set_xticks(range(len(tokens)))
         ax_attn.set_yticks(range(len(tokens)))
-        ax_attn.set_xticklabels(tokens, fontsize=7, rotation=45, ha='right')
-        ax_attn.set_yticklabels(tokens, fontsize=7)
+        ax_attn.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
+        ax_attn.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
         # Add shape annotation
         ax_attn.text(0.5, -0.25, f'Shape: [{len(tokens)} × {len(tokens)}]',
                     transform=ax_attn.transAxes, ha='center', fontsize=8,
@@ -1368,8 +1384,8 @@ class AttentionVisualizer:
         ax_attn2.set_ylabel('Query Token', fontsize=9)
         ax_attn2.set_xticks(range(len(tokens)))
         ax_attn2.set_yticks(range(len(tokens)))
-        ax_attn2.set_xticklabels(tokens, fontsize=7, rotation=45, ha='right')
-        ax_attn2.set_yticklabels(tokens, fontsize=7)
+        ax_attn2.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
+        ax_attn2.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
         ax_attn2.text(0.5, -0.2, f'[{len(tokens)} × {len(tokens)}]',
                      transform=ax_attn2.transAxes, ha='center', fontsize=8,
                      style='italic', color='darkorange')
@@ -1390,7 +1406,7 @@ class AttentionVisualizer:
         ax_v.set_xlabel(f'Dimension (d={head_dim})', fontsize=9)
         ax_v.set_ylabel('Token', fontsize=9)
         ax_v.set_yticks(range(len(tokens)))
-        ax_v.set_yticklabels(tokens, fontsize=8)
+        ax_v.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
         ax_v.text(0.5, -0.2, f'[{len(tokens)} × {head_dim}]',
                  transform=ax_v.transAxes, ha='center', fontsize=8,
                  style='italic', color='purple')
@@ -1412,7 +1428,7 @@ class AttentionVisualizer:
         ax_output.set_xlabel(f'Dimension (d={head_dim})', fontsize=9)
         ax_output.set_ylabel('Token', fontsize=9)
         ax_output.set_yticks(range(len(tokens)))
-        ax_output.set_yticklabels(tokens, fontsize=8)
+        ax_output.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
         ax_output.text(0.5, -0.2, f'[{len(tokens)} × {head_dim}]',
                       transform=ax_output.transAxes, ha='center', fontsize=8,
                       style='italic', color='darkgreen')
@@ -1499,7 +1515,7 @@ class AttentionVisualizer:
             ax.set_xlabel('Dim', fontsize=8)
             ax.set_ylabel('Token', fontsize=8)
             ax.set_yticks(range(len(tokens)))
-            ax.set_yticklabels(tokens, fontsize=6)
+            ax.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=6)
 
         # Hide unused subplots
         for idx in range(num_heads, len(axes)):

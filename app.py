@@ -44,32 +44,80 @@ if 'qkv_data' not in st.session_state:
 st.title("Show Me Your Attention")
 st.header("(...at least once upon a time.)")
 st.markdown("""
-Welcome to a place where you can generate fairytales and observe attention mechanism at the same time. Fancy matrices included!
+Welcome to a place where you can generate fairytales and observe the attention mechanism at the same time. Fancy matrices included!
 """)
 
 # Sidebar for configuration
-st.sidebar.header("⚙️ Configuration")
+st.sidebar.header("Configuration")
 
-# Model selection - TinyStories 8M only
-model_name = "roneneldan/TinyStories-8M"
-st.sidebar.info(f"**Model:** {model_name}")
+# Model selection
+model_options = {
+    "TinyStories-8M (8 layers, 16 heads)": "roneneldan/TinyStories-8M",
+    "TinyStories-1Layer-21M (1 layer, 16 heads)": "roneneldan/TinyStories-1Layer-21M"
+}
+selected_model = st.sidebar.selectbox(
+    "Select Model",
+    options=list(model_options.keys()),
+    index=0,
+    help="Choose which TinyStories model to use"
+)
+model_name = model_options[selected_model]
+
+# Show warning for 21M model
+if "1Layer-21M" in model_name:
+    st.sidebar.warning("**Note:** This model is ~84MB and may take 1-3 minutes to download on first load.")
 
 # Load model button
-if st.sidebar.button("🚀 Load Model") or st.session_state.extractor is None:
+if st.sidebar.button("Load Model"):
     if model_name:
         with st.spinner(f"Loading {model_name}..."):
             try:
                 st.session_state.extractor = AttentionExtractor(model_name=model_name)
-                st.sidebar.success(f"✅ Loaded {model_name}")
+                st.session_state.model_config = {
+                    'name': model_name,
+                    'num_layers': st.session_state.extractor.model.config.num_layers,
+                    'num_heads': st.session_state.extractor.model.config.num_heads,
+                    'hidden_size': st.session_state.extractor.model.config.hidden_size
+                }
+                # Clear previous results when changing models
+                st.session_state.generation_result = None
+                st.session_state.qkv_data = None
+                st.sidebar.success(f"Loaded {model_name}")
             except Exception as e:
-                st.sidebar.error(f"❌ Failed to load model: {str(e)}")
+                st.sidebar.error(f"Failed to load model: {str(e)}")
                 st.session_state.extractor = None
     else:
         st.sidebar.error("Please select a model")
 
+# Auto-load default model on first run
+if st.session_state.extractor is None:
+    with st.spinner(f"Loading {model_name}..."):
+        try:
+            st.session_state.extractor = AttentionExtractor(model_name=model_name)
+            st.session_state.model_config = {
+                'name': model_name,
+                'num_layers': st.session_state.extractor.model.config.num_layers,
+                'num_heads': st.session_state.extractor.model.config.num_heads,
+                'hidden_size': st.session_state.extractor.model.config.hidden_size
+            }
+            st.sidebar.success(f"Loaded {model_name}")
+        except Exception as e:
+            st.sidebar.error(f"Failed to load model: {str(e)}")
+            st.session_state.extractor = None
+
+# Show current model info
+if st.session_state.extractor is not None and 'model_config' in st.session_state:
+    config = st.session_state.model_config
+    st.sidebar.info(f"""
+    **Current Model:**
+    - Layers: {config['num_layers']}
+    - Heads: {config['num_heads']}
+    - Hidden: {config['hidden_size']}
+    """)
+
 # Generation parameters
-st.sidebar.header("🎛️ Generation Settings")
-max_tokens = st.sidebar.slider("Max tokens to generate", 5, 60, 30, help="Number of tokens to generate (fewer = cleaner visualization)")
+st.sidebar.header("Generation Settings")
+max_tokens = st.sidebar.slider("Max tokens to generate", 5, 100, 30, help="Number of tokens to generate (fewer = cleaner visualization)")
 temperature = st.sidebar.slider("Temperature", 0.1, 2.0, 1.0, 0.1)
 
 # Fixed figure sizes and settings
@@ -78,39 +126,38 @@ fig_height = 12
 show_probabilities = True  # Always show token probabilities
 
 # Main content
-tab1, tab2 = st.tabs(["📝 Analysis", "🤖 Model Info"])
+tab1, tab2 = st.tabs(["Analysis", "Model Info"])
 
 with tab1:
 
     # What this app does and how it works section
-    with st.expander("📚 About & How to Use", expanded=False):
+    with st.expander("About & How to Use", expanded=False):
         st.markdown("""
         ### What This App Does
 
-        This tool analyzes **attention patterns during text generation**. It provides three complementary views:
+        Analyzes **attention patterns during text generation** with three views:
+        1. **Generation Attention**: How generated tokens attend to prompt
+        2. **Self-Attention (Q, K, V)**: Internal attention mechanism with math breakdown
+        3. **Complete Attention Matrix**: Full heatmap of all token interactions
 
-        1. **Generation Attention**: How each newly generated token attends back to the original prompt
-        2. **Self-Attention (Q, K, V)**: How prompt tokens attend to each other, revealing the internal attention mechanism with detailed mathematical breakdown
-        3. **Complete Attention Matrix**: Full self-attention matrix showing how all tokens (prompt + generated) attend to each other in one comprehensive heatmap
+        ### Two Models Available
 
-        ---
+        - **TinyStories-8M (8 layers)**: See attention evolve through layers. Fast to load.
+        - **TinyStories-1Layer-21M (1 layer)**: Simpler! Only one transformer block. Takes 1-3 min to download.
 
-        ### Quick Start Guide
+        ### Quick Start
 
-        1. **Enter a prompt**: Type any text (e.g., "The cat is") or select an example
-        2. **Generate text**: Click "Generate & Visualize" - the model continues your prompt
-        3. **Explore visualizations**:
-           - Generation attention bars (how generated words look back at prompt)
-           - Q, K, V matrices (internal attention mechanics)
-           - Complete attention matrix (the big picture!)
+        1. Enter a prompt or select an example
+        2. Click "Generate & Visualize"
+        3. Explore visualizations and switch between layers/heads
 
         """)
 
-    st.subheader("Enter Your Prompt")
+    st.subheader("Write start of your fairytale (e.g. 'once upon a time') or select example:")
 
     # Example prompts
     example = st.selectbox(
-        "Load Example",
+        "Select Example",
         [
             "Custom",
             "The cat is",
@@ -127,20 +174,18 @@ with tab1:
         default_prompt = ""
 
     prompt = st.text_input(
-        "Write start of your fairytale (e.g. 'once upon a time')",
+        "Start writing your story",
         value=default_prompt,
         help="Enter a prompt to generate from"
     )
 
-    # Use last layer by default for generation
-    layer_mode = "last"
-
-    if st.button("🚀 Generate & Visualize", type="primary"):
+    if st.button("Generate & Visualize", type="primary"):
         if not prompt:
             st.error("Please enter a prompt")
         elif st.session_state.extractor is None:
             st.error("Please load a model first (use sidebar)")
         else:
+            # Generate with last layer by default
             with st.spinner("Generating text and analyzing attention..."):
                 try:
                     # Generate text with attention tracking to all prompt tokens
@@ -148,12 +193,13 @@ with tab1:
                         prompt=prompt,
                         max_new_tokens=max_tokens,
                         temperature=temperature,
-                        layer_mode=layer_mode
+                        layer_mode="last"
                     )
 
                     # Store in session state
                     st.session_state.generation_result = result
                     st.session_state.current_prompt = prompt
+                    st.session_state.selected_layer_mode = "last"  # Store initial selection
 
                 except Exception as e:
                     st.error(f"Error during generation: {str(e)}")
@@ -166,7 +212,7 @@ with tab1:
         prompt = st.session_state.current_prompt
 
         # Display results
-        st.header("📊 Results")
+        st.header("Results")
 
         # Show prompt
         st.markdown("**Original Prompt:**")
@@ -177,9 +223,9 @@ with tab1:
         st.success(result['generated_text'])
 
         # Show main visualization
-        st.header("🎯 Generation Attention Visualization")
+        st.header("Generation Attention Visualization")
 
-        with st.expander("📖 What does this show?", expanded=False):
+        with st.expander("What does this show?", expanded=False):
             st.markdown("""
             ### Generated Tokens → Prompt Tokens Attention
 
@@ -201,26 +247,46 @@ with tab1:
             - Color = relative attention (darker = stronger within that subplot)
             """)
 
-        # Layer selection for generation attention
+        # Layer selection for generation attention - dynamic regeneration
+        num_layers = st.session_state.model_config['num_layers'] if 'model_config' in st.session_state else 8
+
+        # Build layer options dynamically based on model
         layer_options = {
-            "Last layer only (Layer 7)": "last",
-            "Average across all layers": "average",
-            "Layer 0 (Earliest)": "layer_0",
-            "Layer 1": "layer_1",
-            "Layer 2": "layer_2",
-            "Layer 3": "layer_3",
-            "Layer 4": "layer_4",
-            "Layer 5": "layer_5",
-            "Layer 6": "layer_6",
-            "Layer 7 (Last)": "layer_7"
+            f"Last layer only (Layer {num_layers-1})": "last",
+            "Average across all layers": "average"
         }
-        layer_selection_display = st.selectbox(
+        for i in range(num_layers):
+            label = f"Layer {i}" + (" (Earliest)" if i == 0 else " (Last)" if i == num_layers-1 else "")
+            layer_options[label] = f"layer_{i}"
+
+        layer_selection = st.selectbox(
             "Which layer(s) to analyze",
             options=list(layer_options.keys()),
             index=0,  # Default to "Last layer only"
-            help="Choose which attention layer(s) to visualize. Note: This was used during generation.",
-            key="gen_layer_display"
+            help="Select a layer to regenerate attention with that layer's data.",
+            key="gen_layer_selection"
         )
+        layer_mode = layer_options[layer_selection]
+
+        # Check if layer selection changed - regenerate if so
+        if 'selected_layer_mode' not in st.session_state:
+            st.session_state.selected_layer_mode = "last"
+
+        if layer_mode != st.session_state.selected_layer_mode:
+            with st.spinner(f"Regenerating attention for {layer_selection}..."):
+                try:
+                    result = st.session_state.extractor.generate_with_attention_to_all_prompt_tokens(
+                        prompt=st.session_state.current_prompt,
+                        max_new_tokens=max_tokens,
+                        temperature=temperature,
+                        layer_mode=layer_mode
+                    )
+                    st.session_state.generation_result = result
+                    st.session_state.selected_layer_mode = layer_mode
+                except Exception as e:
+                    st.error(f"Error regenerating attention: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
 
         st.markdown("""
         **Attention Calculation:**
@@ -249,27 +315,11 @@ with tab1:
         st.image(buf, use_container_width=True)
         plt.close()
 
-        # Show attention matrix
-        with st.expander("📊 Attention Matrix (Raw Values)"):
-            st.markdown("**Rows:** Generated tokens | **Columns:** Prompt tokens")
-
-            # Create attention matrix
-            attention_matrix = np.array(result['attention_to_prompt'])
-
-            # Display as dataframe
-            import pandas as pd
-            df = pd.DataFrame(
-                attention_matrix,
-                index=[f"Gen[{i}]: {tok}" for i, tok in enumerate(result['generated_tokens'])],
-                columns=result['prompt_tokens']
-            )
-            st.dataframe(df.style.background_gradient(cmap='viridis', axis=1), use_container_width=True)
-
         # Q, K, V Visualization Section
         st.markdown("---")
-        st.header("🔬 Prompt Self-Attention Mechanism")
+        st.header("Prompt Self-Attention Mechanism")
 
-        with st.expander("📖 What does this show?", expanded=False):
+        with st.expander("What does this show?", expanded=False):
             st.markdown("""
             ### Prompt Tokens → Prompt Tokens (Self-Attention)
 
@@ -294,7 +344,7 @@ with tab1:
             - Step-by-step mathematical transformations with visual separators
             """)
 
-        with st.expander("🔬 Explore Q, K, V Matrices", expanded=True):
+        with st.expander("Explore Q, K, V Matrices", expanded=True):
             st.markdown("""
             **The three fundamental matrices:**
             - **Query (Q)**: What each token is "looking for"
@@ -321,18 +371,21 @@ with tab1:
 
             $$\\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{Q \\cdot K^T}{\\sqrt{d_k}}\\right) \\cdot V$$
 
-            The attention output is then: $\\text{Output}_i = \\sum_j \\text{Attention}(i,j) \\cdot V_j$
+            where $d_k$ is the head dimension.
 
-            where $d_k$ is the head dimension (key dimension).
+            The attention weights for token $i$ are: $\\text{Attention}(i,j) = \\text{softmax}\\left(\\frac{Q_i \\cdot K_j^T}{\\sqrt{d_k}}\\right)$
+
+            And the output for each token is: $\\text{Output}_i = \\sum_j \\text{Attention}(i,j) \\cdot V_j$
             """)
 
             # Controls for Q, K, V selection
             col1, col2 = st.columns(2)
             with col1:
+                num_layers = st.session_state.model_config['num_layers'] if 'model_config' in st.session_state else 8
                 qkv_layer = st.selectbox(
                     "Select layer for Q/K/V",
-                    options=list(range(8)),
-                    index=7,
+                    options=list(range(num_layers)),
+                    index=num_layers-1,  # Default to last layer
                     help="Which layer to extract Q, K, V from"
                 )
             with col2:
@@ -398,9 +451,9 @@ with tab1:
 
         # Full Attention Matrix Section
         st.markdown("---")
-        st.header("🌐 Complete Attention Matrix")
+        st.header("Complete Attention Matrix")
 
-        with st.expander("📖 What does this show?", expanded=False):
+        with st.expander("What does this show?", expanded=False):
             st.markdown("""
             ### Full Self-Attention: All Tokens → All Tokens
 
@@ -422,7 +475,7 @@ with tab1:
             **Note:** Due to causal (autoregressive) masking, tokens can only attend to previous tokens, creating a triangular pattern.
             """)
 
-        with st.expander("🔬 View Full Attention Matrix", expanded=True):
+        with st.expander("View Full Attention Matrix", expanded=True):
             # Get full sequence tokens
             all_tokens = result['prompt_tokens'] + result['generated_tokens']
             n_prompt = len(result['prompt_tokens'])
@@ -440,10 +493,11 @@ with tab1:
             # Layer selection for full matrix
             col1, col2 = st.columns([3, 1])
             with col1:
+                num_layers = st.session_state.model_config['num_layers'] if 'model_config' in st.session_state else 8
                 full_matrix_layer = st.selectbox(
                     "Select layer for full attention matrix",
-                    options=list(range(8)),
-                    index=7,
+                    options=list(range(num_layers)),
+                    index=num_layers-1,  # Default to last layer
                     help="Which layer to visualize the complete attention matrix",
                     key="full_matrix_layer"
                 )
@@ -475,11 +529,12 @@ with tab1:
                     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                     cbar.set_label('Attention Weight', fontsize=12, weight='bold')
 
-                    # Set ticks and labels
+                    # Set ticks and labels (clean Ġ from tokens)
+                    clean_tokens = [tok.replace('Ġ', ' ').strip() for tok in all_tokens]
                     ax.set_xticks(range(n_total))
                     ax.set_yticks(range(n_total))
-                    ax.set_xticklabels(all_tokens, rotation=90, ha='right', fontsize=8)
-                    ax.set_yticklabels(all_tokens, fontsize=8)
+                    ax.set_xticklabels(clean_tokens, rotation=90, ha='right', fontsize=8)
+                    ax.set_yticklabels(clean_tokens, fontsize=8)
 
                     # Remove grid lines
                     ax.grid(False)
@@ -518,95 +573,173 @@ with tab1:
                     st.code(traceback.format_exc())
 
 with tab2:
+    if st.session_state.extractor is not None and 'model_config' in st.session_state:
+        config = st.session_state.model_config
+        model_name = config['name']
 
-    st.markdown("""
+        # Determine which model is loaded
+        if "8M" in model_name:
+            st.markdown(f"""
+            **TinyStories-8M** is a small language model trained on simple children's stories.
 
-    **TinyStories-8M** is a small language model trained on simple children's stories.
+            #### Architecture Specifications
 
-    #### Architecture Specifications
+            - **Total Parameters:** 8,116,224 (≈8M)
+            - **Trainable Parameters:** 8,116,224 (100% trainable)
+            - **Model Type:** Causal (Autoregressive) Transformer
+            - **Architecture Style:** GPT-2 based
 
-    - **Total Parameters:** 8,116,224 (≈8M)
-    - **Trainable Parameters:** 8,116,224 (100% trainable)
-    - **Model Type:** Causal (Autoregressive) Transformer
-    - **Architecture Style:** GPT-2 based
+            #### Transformer Configuration
 
-    #### Transformer Configuration
+            - **Number of Layers:** {config['num_layers']} transformer blocks
+            - **Attention Heads per Layer:** {config['num_heads']} heads
+            - **Hidden Size:** {config['hidden_size']} dimensions
+            - **Head Dimension:** {config['hidden_size'] // config['num_heads']} (hidden_size / num_heads = {config['hidden_size']} / {config['num_heads']})
+            - **Vocabulary Size:** 50,257 tokens
+            - **Maximum Sequence Length:** 2,048 tokens
+            - **Context Window:** 2,048 tokens
 
-    - **Number of Layers:** 8 transformer blocks
-    - **Attention Heads per Layer:** 16 heads
-    - **Hidden Size:** 256 dimensions
-    - **Head Dimension:** 16 (hidden_size / num_heads = 256 / 16)
-    - **Vocabulary Size:** 50,257 tokens
-    - **Maximum Sequence Length:** 2,048 tokens
-    - **Context Window:** 2,048 tokens
+            #### Parameter Breakdown
 
-    #### Parameter Breakdown
+            Each transformer layer contains:
+            - **Self-Attention Module:**
+              - Query (Q), Key (K), Value (V) projections: 3 × ({config['hidden_size']} × {config['hidden_size']}) = {3 * config['hidden_size'] * config['hidden_size']:,} params
+              - Output projection: {config['hidden_size']} × {config['hidden_size']} = {config['hidden_size'] * config['hidden_size']:,} params
+              - Total per layer: ~{(4 * config['hidden_size'] * config['hidden_size']) // 1000}K params
 
-    Each transformer layer contains:
-    - **Self-Attention Module:**
-      - Query (Q), Key (K), Value (V) projections: 3 × (256 × 256) = 196,608 params
-      - Output projection: 256 × 256 = 65,536 params
-      - Total per layer: ~262K params
+            - **Feed-Forward Network:**
+              - First linear layer: {config['hidden_size']} × {config['hidden_size'] * 4} = {config['hidden_size'] * config['hidden_size'] * 4:,} params (4× expansion)
+              - Second linear layer: {config['hidden_size'] * 4} × {config['hidden_size']} = {config['hidden_size'] * config['hidden_size'] * 4:,} params
+              - Total per layer: ~{(2 * config['hidden_size'] * config['hidden_size'] * 4) // 1000}K params
 
-    - **Feed-Forward Network:**
-      - First linear layer: 256 × 1,024 = 262,144 params (4× expansion)
-      - Second linear layer: 1,024 × 256 = 262,144 params
-      - Total per layer: ~524K params
+            - **Layer Normalization:** 2 × {config['hidden_size']} = {2 * config['hidden_size']} params per layer
 
-    - **Layer Normalization:** 2 × 256 = 512 params per layer
+            **Total per transformer block:** ~{((4 * config['hidden_size'] * config['hidden_size']) + (2 * config['hidden_size'] * config['hidden_size'] * 4)) // 1000}K parameters × {config['num_layers']} layers = ~{((4 * config['hidden_size'] * config['hidden_size']) + (2 * config['hidden_size'] * config['hidden_size'] * 4)) * config['num_layers'] // 1000000}M
 
-    **Total per transformer block:** ~787K parameters × 8 layers = ~6.3M
+            **Embedding layers:**
+            - Token embeddings: 50,257 × {config['hidden_size']} = ~{(50257 * config['hidden_size']) // 1000000}M params
+            - Position embeddings: 2,048 × {config['hidden_size']} = ~{(2048 * config['hidden_size']) // 1000000}M params
 
-    **Embedding layers:**
-    - Token embeddings: 50,257 × 256 = ~12.9M params
-    - Position embeddings: 2,048 × 256 = ~0.5M params
+            #### Performance Characteristics
 
-    #### Training Details
+            **Memory Usage:**
+            - Model weights: ~32 MB (8M params × 4 bytes/float32)
+            - Activations (50 tokens): ~10 MB
+            - Total GPU/CPU memory: ~50-100 MB
 
-    The TinyStories models were trained on a synthetic dataset of simple children's stories
-    generated to contain only words that a typical 3-4 year old would understand. 
+            **Inference Speed (CPU):**
+            - Single token generation: 10-30ms
+            - Attention extraction overhead: <5ms
+            - Suitable for real-time interactive applications
+            """)
 
-    #### Attention Mechanism Details
+        elif "1Layer" in model_name:
+            st.markdown(f"""
+            **TinyStories-1Layer-21M** is a single-layer language model trained on simple children's stories.
 
-    **Multi-Head Self-Attention:**
-    - Each layer has 16 attention heads operating in parallel
-    - Each head learns different attention patterns (e.g., syntax, semantics, positional)
-    - Attention scores are computed as: `softmax(Q @ K^T / sqrt(16))`
-    - Output is weighted sum of Values: `Attention @ V`
+            #### Architecture Specifications
 
-    **Causal Masking:**
-    - Attention is masked to prevent looking at future tokens
-    - This ensures autoregressive generation (left-to-right)
-    - Each position can only attend to itself and previous positions
+            - **Total Parameters:** ~21 million (≈21M)
+            - **Model Type:** Causal (Autoregressive) Transformer
+            - **Architecture Style:** GPT-2 based
+            - **Special Feature:** Only 1 transformer layer!
 
-    #### Performance Characteristics
+            #### Transformer Configuration
 
-    **Memory Usage:**
-    - Model weights: ~32 MB (8M params × 4 bytes/float32)
-    - Activations (50 tokens): ~10 MB
-    - Total GPU/CPU memory: ~50-100 MB
+            - **Number of Layers:** {config['num_layers']} transformer block
+            - **Attention Heads per Layer:** {config['num_heads']} heads
+            - **Hidden Size:** {config['hidden_size']} dimensions
+            - **Head Dimension:** {config['hidden_size'] // config['num_heads']} (hidden_size / num_heads = {config['hidden_size']} / {config['num_heads']})
+            - **Vocabulary Size:** 50,257 tokens
+            - **Maximum Sequence Length:** 2,048 tokens
+            - **Context Window:** 2,048 tokens
 
-    **Inference Speed (CPU):**
-    - Single token generation: 10-30ms
-    - Attention extraction overhead: <5ms
-    - Suitable for real-time interactive applications
+            #### Why Only 1 Layer?
 
-    #### Comparison to Other Models
+            This model demonstrates that language models can generate coherent text even with just a **single transformer block**!
+            - Makes it **extremely simple** to understand attention mechanics
+            - Each of the {config['num_heads']} attention heads must learn everything in parallel
+            - No hierarchical processing across layers
+            - Perfect for educational purposes and visualization
 
-    | Model | Parameters | Layers | Heads | Hidden Size |
-    |-------|-----------|--------|-------|-------------|
-    | **TinyStories-8M** | 8M | 8 | 16 | 256 |
-    | TinyStories-33M | 33M | 8 | 12 | 768 |
-    | GPT-2 Small | 124M | 12 | 12 | 768 |
-    | GPT-2 Medium | 355M | 24 | 16 | 1024 |
+            #### Parameter Breakdown
 
-    ---
+            The single transformer layer contains:
+            - **Self-Attention Module:**
+              - Query (Q), Key (K), Value (V) projections: 3 × ({config['hidden_size']} × {config['hidden_size']}) = {3 * config['hidden_size'] * config['hidden_size']:,} params
+              - Output projection: {config['hidden_size']} × {config['hidden_size']} = {config['hidden_size'] * config['hidden_size']:,} params
+              - Total: ~{(4 * config['hidden_size'] * config['hidden_size']) // 1000}K params
 
-    ### References
+            - **Feed-Forward Network:**
+              - First linear layer: {config['hidden_size']} × {config['hidden_size'] * 4} = {config['hidden_size'] * config['hidden_size'] * 4:,} params (4× expansion)
+              - Second linear layer: {config['hidden_size'] * 4} × {config['hidden_size']} = {config['hidden_size'] * config['hidden_size'] * 4:,} params
+              - Total: ~{(2 * config['hidden_size'] * config['hidden_size'] * 4) // 1000}K params
 
-    **TinyStories Paper:**
-    - Eldan, R., & Li, Y. (2023). "TinyStories: How Small Can Language Models Be and Still Speak Coherent English?"
-    - arXiv:2305.07759
-    - [https://arxiv.org/abs/2305.07759](https://arxiv.org/abs/2305.07759)
+            - **Layer Normalization:** 2 × {config['hidden_size']} = {2 * config['hidden_size']} params
 
-    """)
+            **Total transformer block:** ~{((4 * config['hidden_size'] * config['hidden_size']) + (2 * config['hidden_size'] * config['hidden_size'] * 4)) // 1000000}M parameters
+
+            **Embedding layers:**
+            - Token embeddings: 50,257 × {config['hidden_size']} = ~{(50257 * config['hidden_size']) // 1000000}M params
+            - Position embeddings: 2,048 × {config['hidden_size']} = ~{(2048 * config['hidden_size']) // 1000000}M params
+
+            #### Performance Characteristics
+
+            **Memory Usage:**
+            - Model weights: ~84 MB (21M params × 4 bytes/float32)
+            - Despite larger size, simpler architecture
+            - Total GPU/CPU memory: ~100-150 MB
+
+            **Inference Speed (CPU):**
+            - Single token generation: 5-20ms (faster than multi-layer!)
+            - Only one attention layer to compute
+            - Attention extraction overhead: <3ms
+            - Excellent for real-time applications
+            """)
+
+        # Common sections for both models
+        st.markdown("""
+        #### Training Details
+
+        The TinyStories models were trained on a synthetic dataset of simple children's stories
+        generated to contain only words that a typical 3-4 year old would understand.
+
+        #### Attention Mechanism Details
+
+        **Multi-Head Self-Attention:**
+        """)
+        st.markdown(f"""
+        - Each layer has {config['num_heads']} attention heads operating in parallel
+        - Each head learns different attention patterns (e.g., syntax, semantics, positional)
+        - Attention scores are computed as: `softmax(Q @ K^T / sqrt({config['hidden_size'] // config['num_heads']}))`
+        - Output is weighted sum of Values: `Attention @ V`
+        """)
+
+        st.markdown("""
+        **Causal Masking:**
+        - Attention is masked to prevent looking at future tokens
+        - This ensures autoregressive generation (left-to-right)
+        - Each position can only attend to itself and previous positions
+
+        #### Comparison to Other Models
+
+        | Model | Parameters | Layers | Heads | Hidden Size |
+        |-------|-----------|--------|-------|-------------|
+        | **TinyStories-1Layer-21M** | 21M | 1 | 16 | 1024 |
+        | **TinyStories-8M** | 8M | 8 | 16 | 256 |
+        | TinyStories-33M | 33M | 8 | 12 | 768 |
+        | GPT-2 Small | 124M | 12 | 12 | 768 |
+        | GPT-2 Medium | 355M | 24 | 16 | 1024 |
+
+        ---
+
+        ### References
+
+        **TinyStories Paper:**
+        - Eldan, R., & Li, Y. (2023). "TinyStories: How Small Can Language Models Be and Still Speak Coherent English?"
+        - arXiv:2305.07759
+        - [https://arxiv.org/abs/2305.07759](https://arxiv.org/abs/2305.07759)
+
+        """)
+    else:
+        st.info("Please load a model from the sidebar to see detailed information.")
