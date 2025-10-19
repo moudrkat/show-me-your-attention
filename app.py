@@ -364,8 +364,9 @@ with tab1:
             $$V_i^{(\\ell,h)} = W_V^{(\\ell,h)} \\cdot h_i$$
 
             where:
-            - $h_i$ = hidden state (vector representation of token $i$ at this layer)
-            - $W_Q, W_K, W_V$ = learned projection matrices
+            - $h_i$ = hidden state **vector** (representation of token $i$ at this layer)
+            - $W_Q, W_K, W_V$ = learned projection **matrices**
+            - $Q_i, K_i, V_i$ = resulting **vectors** (one per token)
             - $h_i \\in \\mathbb{R}^{d_{\\text{model}}}$ (256-dim for 8M, 1024-dim for 1Layer-21M)
             """)
 
@@ -374,12 +375,42 @@ with tab1:
 
             $$\\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{Q \\cdot K^T}{\\sqrt{d_k}}\\right) \\cdot V$$
 
-            where $d_k$ is the head dimension.
+            where:
+            - $Q, K, V$ are **matrices** (shape: [num_tokens × d_k])
+            - $d_k$ is the head dimension
+            - $Q \\cdot K^T$ produces a [num_tokens × num_tokens] matrix of all pairwise scores
 
-            The attention weights for token $i$ are: $\\text{Attention}(i,j) = \\text{softmax}\\left(\\frac{Q_i \\cdot K_j}{\\sqrt{d_k}}\\right)$
-
-            And the output for each token is: $\\text{Output}_i = \\sum_j \\text{Attention}(i,j) \\cdot V_j$
+            For individual tokens:
+            - $Q_i \\cdot K_j$ = dot product of two **vectors** → scalar score
+            - $\\text{Attention}(i,j) = \\text{softmax}\\left(\\frac{Q_i \\cdot K_j}{\\sqrt{d_k}}\\right)$ = attention weight (scalar)
+            - $\\text{Output}_i = \\sum_j \\text{Attention}(i,j) \\cdot V_j$ = weighted sum of value **vectors** → output **vector**
             """)
+
+            # Temporarily hidden - will be used later in the app
+            # with st.expander("Still confused about the indices?", expanded=False):
+            #     st.markdown("""
+            #     **Understanding the notation:** When we write Q, K, V - are they matrices or vectors?
+            #
+            #     This diagram shows how individual vectors (Qᵢ, Kⱼ, Vⱼ) are **rows** extracted from the full matrices (Q, K, V).
+            #     """)
+            #
+            #     # Get head dimension from model config
+            #     if 'model_config' in st.session_state:
+            #         head_dim = st.session_state.model_config['hidden_size'] // st.session_state.model_config['num_heads']
+            #     else:
+            #         head_dim = 16  # Default
+            #
+            #     # Create and display the diagram
+            #     fig_diagram = plt.figure(figsize=(18, 10))
+            #     st.session_state.viz.plot_attention_formula_diagram(
+            #         num_tokens=4,
+            #         head_dim=head_dim
+            #     )
+            #     buf_diagram = io.BytesIO()
+            #     plt.savefig(buf_diagram, format='png', dpi=150, bbox_inches='tight')
+            #     buf_diagram.seek(0)
+            #     st.image(buf_diagram, use_container_width=True)
+            #     plt.close()
 
             # Controls for Q, K, V selection
             col1, col2 = st.columns(2)

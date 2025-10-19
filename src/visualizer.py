@@ -268,7 +268,7 @@ class AttentionVisualizer:
             ax.set_xlabel("Token Position")
             if idx == 0:
                 ax.set_ylabel("Activation")
-            ax.grid(True, alpha=0.3)
+            ax.grid(False)
 
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         fig.suptitle(f"Neuron Activation Comparison - Layer {layer_idx}", fontsize=14)
@@ -363,7 +363,7 @@ class AttentionVisualizer:
             ax.set_title(f"Attention {metric.capitalize()} per Layer")
             ax.set_xlabel("Layer")
             ax.set_ylabel(metric.capitalize())
-            ax.grid(True, alpha=0.3)
+            ax.grid(False)
 
         plt.tight_layout()
 
@@ -417,7 +417,7 @@ class AttentionVisualizer:
         ax.set_xlabel("Layer", fontsize=10)
         ax.set_ylabel("Mean Attention Weight", fontsize=10)
         ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         # Plot 2: Target → Instruction (Max) - STRONGEST HEAD
         ax = axes[1]
@@ -435,7 +435,7 @@ class AttentionVisualizer:
         ax.set_title(f"Target → Instruction (Max)\nStrongest attention head per layer", fontsize=11, weight='bold')
         ax.set_xlabel("Layer", fontsize=10)
         ax.set_ylabel("Max Attention Weight", fontsize=10)
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         # Plot 3: Layer-to-layer change (derivative)
         ax = axes[2]
@@ -457,7 +457,7 @@ class AttentionVisualizer:
         ax.set_title("Layer-to-Layer Change\nWhich layers strengthen binding (positive = stronger)", fontsize=11, weight='bold')
         ax.set_xlabel("Layer", fontsize=10)
         ax.set_ylabel("Attention Change", fontsize=10)
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         # Plot 4: Attention focus (variance across heads)
         ax = axes[3]
@@ -481,7 +481,7 @@ class AttentionVisualizer:
         ax.set_title("Attention Focus (Max/Mean Ratio)\nHigher = more concentrated in few heads", fontsize=11, weight='bold')
         ax.set_xlabel("Layer", fontsize=10)
         ax.set_ylabel("Focus Ratio", fontsize=10)
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         fig.suptitle(f'Instruction-Target Attention Analysis: "{target_word}" ({model_type_label})',
                     fontsize=14, y=1.00, weight='bold')
@@ -600,7 +600,7 @@ class AttentionVisualizer:
             ax.set_ylabel('Attention Score', fontsize=10)
             ax.set_xticks(x)
             ax.set_xticklabels([f"{i}\n{tok}" for i, tok in enumerate(generated_tokens)], rotation=45, ha='right')
-            ax.grid(axis='y', alpha=0.3)
+            ax.grid(False)
 
             # Plot 2: Layer heatmap
             ax = axes[1]
@@ -646,7 +646,7 @@ class AttentionVisualizer:
             ax.set_xticks(x)
             ax.set_xticklabels([f"{i}\n{tok}" for i, tok in enumerate(generated_tokens)],
                               rotation=45, ha='right', fontsize=9)
-            ax.grid(axis='y', alpha=0.3, linestyle='--')
+            ax.grid(False)
 
             # Add text annotation for prompt
             fig.text(0.5, 0.95, f'Prompt: "{prompt}"', ha='center', fontsize=10,
@@ -723,7 +723,7 @@ class AttentionVisualizer:
                 xticklabels = [f"{i}\n{tok}" for i, tok in enumerate(generated_tokens)]
 
             ax.set_xticklabels(xticklabels, rotation=45, ha='right', fontsize=7)
-            ax.grid(axis='y', alpha=0.3, linestyle='--')
+            ax.grid(False)
             ax.tick_params(axis='y', labelsize=8)
 
             # Only show x-label on bottom plot
@@ -842,7 +842,7 @@ class AttentionVisualizer:
         axes[0].set_xlabel('Layer', fontsize=10)
         axes[0].set_ylabel('Cosine Similarity', fontsize=10)
         axes[0].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-        axes[0].grid(True, alpha=0.3)
+        axes[0].grid(False)
         axes[0].axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
 
         # Configure Plot 2
@@ -850,7 +850,7 @@ class AttentionVisualizer:
                          fontsize=12, weight='bold')
         axes[1].set_xlabel('Layer', fontsize=10)
         axes[1].set_ylabel('Attention Score', fontsize=10)
-        axes[1].grid(True, alpha=0.3)
+        axes[1].grid(False)
 
         # Plot 3: Correlation scatter plot (all prompts combined)
         ax = axes[2]
@@ -878,7 +878,7 @@ class AttentionVisualizer:
         ax.set_xlabel('Attention Score (Target → Instruction)', fontsize=10)
         ax.set_ylabel('Cosine Similarity (Embeddings)', fontsize=10)
         ax.legend(fontsize=8, loc='best')
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         # Plot 4: Difference (Attention - Normalized Similarity) across layers
         ax = axes[3]
@@ -941,7 +941,7 @@ class AttentionVisualizer:
                     fontsize=12, weight='bold')
         ax.set_xlabel('Layer', fontsize=10)
         ax.set_ylabel('Attention - Similarity', fontsize=10)
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
         ax.text(0.05, 0.95, 'Positive = More attention than similarity\nNegative = More similarity than attention',
                transform=ax.transAxes, fontsize=9, verticalalignment='top',
                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.3))
@@ -1084,7 +1084,7 @@ class AttentionVisualizer:
         ax.set_xlabel('Layer', fontsize=10)
         ax.set_ylabel('Entropy (nats)', fontsize=10)
         ax.legend(fontsize=8, loc='best')
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
 
         # Plot 2: Average entropy comparison
         ax = axes[1]
@@ -1120,7 +1120,7 @@ class AttentionVisualizer:
             ax.set_ylabel('Mean Entropy', fontsize=10)
             ax.set_xticks(range(len(prompt_labels)))
             ax.set_xticklabels(prompt_labels, rotation=45, ha='right', fontsize=8)
-            ax.grid(axis='y', alpha=0.3)
+            ax.grid(False)
 
         plt.tight_layout()
 
@@ -1301,6 +1301,7 @@ class AttentionVisualizer:
         ax_q.set_ylabel('Token', fontsize=9)
         ax_q.set_yticks(range(len(tokens)))
         ax_q.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
+        ax_q.grid(False)
         # Add shape annotation
         ax_q.text(0.5, -0.15, f'Shape: [{len(tokens)} × {head_dim}]',
                  transform=ax_q.transAxes, ha='center', fontsize=8,
@@ -1322,6 +1323,7 @@ class AttentionVisualizer:
         ax_k.set_ylabel(f'Dimension (d={head_dim})', fontsize=9)
         ax_k.set_xticks(range(len(tokens)))
         ax_k.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=8, rotation=45, ha='right')
+        ax_k.grid(False)
         # Add shape annotation
         ax_k.text(0.5, -0.25, f'Shape: [{head_dim} × {len(tokens)}]',
                  transform=ax_k.transAxes, ha='center', fontsize=8,
@@ -1346,6 +1348,7 @@ class AttentionVisualizer:
         ax_scores.set_yticks(range(len(tokens)))
         ax_scores.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
         ax_scores.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
+        ax_scores.grid(False)
         # Add shape annotation
         ax_scores.text(0.5, -0.25, f'Shape: [{len(tokens)} × {len(tokens)}]',
                       transform=ax_scores.transAxes, ha='center', fontsize=8,
@@ -1371,6 +1374,7 @@ class AttentionVisualizer:
         ax_attn.set_yticks(range(len(tokens)))
         ax_attn.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
         ax_attn.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
+        ax_attn.grid(False)
         # Add shape annotation
         ax_attn.text(0.5, -0.30, f'Shape: [{len(tokens)} × {len(tokens)}]',
                     transform=ax_attn.transAxes, ha='center', fontsize=8,
@@ -1387,6 +1391,7 @@ class AttentionVisualizer:
         ax_attn2.set_yticks(range(len(tokens)))
         ax_attn2.set_xticklabels([self.clean_token(t) for t in tokens], fontsize=7, rotation=45, ha='right')
         ax_attn2.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=7)
+        ax_attn2.grid(False)
         ax_attn2.text(0.5, -0.2, f'[{len(tokens)} × {len(tokens)}]',
                      transform=ax_attn2.transAxes, ha='center', fontsize=8,
                      style='italic', color='darkorange')
@@ -1408,6 +1413,7 @@ class AttentionVisualizer:
         ax_v.set_ylabel('Token', fontsize=9)
         ax_v.set_yticks(range(len(tokens)))
         ax_v.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
+        ax_v.grid(False)
         ax_v.text(0.5, -0.2, f'[{len(tokens)} × {head_dim}]',
                  transform=ax_v.transAxes, ha='center', fontsize=8,
                  style='italic', color='purple')
@@ -1430,6 +1436,7 @@ class AttentionVisualizer:
         ax_output.set_ylabel('Token', fontsize=9)
         ax_output.set_yticks(range(len(tokens)))
         ax_output.set_yticklabels([self.clean_token(t) for t in tokens], fontsize=8)
+        ax_output.grid(False)
         ax_output.text(0.5, -0.2, f'[{len(tokens)} × {head_dim}]',
                       transform=ax_output.transAxes, ha='center', fontsize=8,
                       style='italic', color='darkgreen')
@@ -1529,6 +1536,248 @@ class AttentionVisualizer:
         fig.suptitle(f'{title} Matrices Across All Heads (Layer {layer_idx})',
                     fontsize=16, y=0.995, weight='bold')
         plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved to {save_path}")
+
+        plt.show()
+
+    def plot_attention_formula_diagram(
+        self,
+        num_tokens: int = 4,
+        head_dim: int = 64,
+        save_path: Optional[str] = None,
+        figsize: Tuple[int, int] = (20, 12)
+    ):
+        """
+        Create a visual diagram showing the relationship between matrices and vectors
+        in the attention mechanism formula with clear i and j indexing.
+
+        Args:
+            num_tokens: Number of tokens to show in the example
+            head_dim: Head dimension to show (use larger values like 64 to show long vectors)
+            save_path: Path to save figure (optional)
+            figsize: Figure size tuple
+        """
+        fig = plt.figure(figsize=figsize)
+        import matplotlib.gridspec as gridspec
+        import matplotlib.patches as mpatches
+
+        gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.6, wspace=0.4,
+                              top=0.93, bottom=0.05, left=0.05, right=0.95,
+                              height_ratios=[1.2, 0.4, 0.8, 0.4, 1.2])
+
+        # Create dummy data for visualization
+        np.random.seed(42)
+        Q_matrix = np.random.randn(num_tokens, head_dim) * 0.5
+        K_matrix = np.random.randn(num_tokens, head_dim) * 0.5
+        V_matrix = np.random.randn(num_tokens, head_dim) * 0.5
+
+        # Use clear i and j indices
+        i = 1  # Query token index
+        j = 2  # Key token index
+
+        # Pre-calculate the dot product and scaled score for this (i,j) pair
+        dot_product = np.dot(Q_matrix[i], K_matrix[j])
+        scaled_score = dot_product / np.sqrt(head_dim)
+
+        # ===== Top Row: Show full Q, K, V matrices with clear indexing =====
+
+        # Q matrix
+        ax_q_full = fig.add_subplot(gs[0, 0:2])
+        im_q = ax_q_full.imshow(Q_matrix, aspect='auto', cmap='gray', alpha=0.8)
+        ax_q_full.set_title('Q Matrix (ALL tokens)\n"What each token is looking for"',
+                           fontsize=12, weight='bold')
+        ax_q_full.set_ylabel('Token index', fontsize=10)
+        ax_q_full.set_xlabel(f'Hidden dimensions (d_k = {head_dim})', fontsize=9)
+
+        # Add token labels with explicit indexing
+        ax_q_full.set_yticks(range(num_tokens))
+        ax_q_full.set_yticklabels([f'i={idx}' if idx == i else f'{idx}'
+                                   for idx in range(num_tokens)], fontsize=10)
+
+        # Highlight row i with thick border
+        rect_i = mpatches.Rectangle((-0.5, i-0.5), head_dim, 1,
+                                    linewidth=3, edgecolor='black', facecolor='none',
+                                    linestyle='--')
+        ax_q_full.add_patch(rect_i)
+        ax_q_full.text(head_dim + 2, i, f'← Row i={i} = q_i', fontsize=11,
+                      weight='bold', ha='left', va='center')
+
+        ax_q_full.text(0.5, -0.22, f'Shape: [{num_tokens} × {head_dim}]',
+                      transform=ax_q_full.transAxes, ha='center', fontsize=9,
+                      style='italic')
+
+        # K matrix (transposed for visualization to match Q @ K^T)
+        ax_k_full = fig.add_subplot(gs[0, 2:4])
+        im_k = ax_k_full.imshow(K_matrix.T, aspect='auto', cmap='gray', alpha=0.8)
+        ax_k_full.set_title('K^T Matrix (ALL tokens, transposed)\n"What each token contains"',
+                           fontsize=12, weight='bold')
+        ax_k_full.set_xlabel('Token index', fontsize=10)
+        ax_k_full.set_ylabel(f'Hidden dimensions (d_k = {head_dim})', fontsize=9)
+
+        # Add token labels (now on x-axis since transposed)
+        ax_k_full.set_xticks(range(num_tokens))
+        ax_k_full.set_xticklabels([f'j={idx}' if idx == j else f'{idx}'
+                                   for idx in range(num_tokens)], fontsize=10)
+
+        # Highlight column j (since we transposed, row j becomes column j)
+        rect_j = mpatches.Rectangle((j-0.5, -0.5), 1, head_dim,
+                                    linewidth=3, edgecolor='black', facecolor='none',
+                                    linestyle='--')
+        ax_k_full.add_patch(rect_j)
+        ax_k_full.text(j, -2, f'Column j={j}\n= k_j^T', fontsize=11,
+                      weight='bold', ha='center', va='top')
+
+        ax_k_full.text(0.5, -0.22, f'Shape: [{head_dim} × {num_tokens}]',
+                      transform=ax_k_full.transAxes, ha='center', fontsize=9,
+                      style='italic')
+
+        # Attention scores matrix (result of Q @ K^T)
+        ax_scores = fig.add_subplot(gs[0, 4])
+        scores_matrix = np.matmul(Q_matrix, K_matrix.T) / np.sqrt(head_dim)
+        im_scores = ax_scores.imshow(scores_matrix, aspect='auto', cmap='gray', alpha=0.8)
+        ax_scores.set_title('Attention Scores\nQ @ K^T / √d_k', fontsize=12, weight='bold')
+        ax_scores.set_ylabel('Query i', fontsize=10)
+        ax_scores.set_xlabel('Key j', fontsize=10)
+        ax_scores.set_yticks(range(num_tokens))
+        ax_scores.set_yticklabels([f'i={idx}' for idx in range(num_tokens)], fontsize=9)
+        ax_scores.set_xticks(range(num_tokens))
+        ax_scores.set_xticklabels([f'j={idx}' for idx in range(num_tokens)], fontsize=9)
+
+        # Highlight the specific (i,j) cell
+        rect_score = mpatches.Rectangle((j-0.5, i-0.5), 1, 1,
+                                        linewidth=3, edgecolor='black', facecolor='none',
+                                        linestyle='-')
+        ax_scores.add_patch(rect_score)
+        ax_scores.text(j, i-0.7, f'Score({i},{j})\n={scaled_score:.3f}',
+                      ha='center', va='bottom', fontsize=8, weight='bold')
+
+        ax_scores.text(0.5, -0.22, f'[{num_tokens}×{num_tokens}]',
+                      transform=ax_scores.transAxes, ha='center', fontsize=9,
+                      style='italic')
+
+        # ===== Arrow Row 1 =====
+        ax_arrow1 = fig.add_subplot(gs[1, 0:2])
+        ax_arrow1.axis('off')
+        ax_arrow1.annotate('', xy=(0.5, 0.2), xytext=(0.5, 0.8),
+                          arrowprops=dict(arrowstyle='->', lw=3, color='black'),
+                          xycoords='axes fraction')
+        ax_arrow1.text(0.5, 0.5, 'Extract row i', ha='center', va='center',
+                      fontsize=10, weight='bold')
+
+        ax_arrow2 = fig.add_subplot(gs[1, 2:4])
+        ax_arrow2.axis('off')
+        ax_arrow2.annotate('', xy=(0.5, 0.2), xytext=(0.5, 0.8),
+                          arrowprops=dict(arrowstyle='->', lw=3, color='black'),
+                          xycoords='axes fraction')
+        ax_arrow2.text(0.5, 0.5, 'Extract row j', ha='center', va='center',
+                      fontsize=10, weight='bold')
+
+        # ===== Middle Row: Show extracted vectors (long and thin) =====
+
+        # q_i vector (long horizontal vector)
+        ax_qi = fig.add_subplot(gs[2, 0:2])
+        Q_i_vector = Q_matrix[i:i+1, :]  # Shape: [1, head_dim]
+        ax_qi.imshow(Q_i_vector, aspect='auto', cmap='gray', alpha=0.8)
+        ax_qi.set_title(f'q_i vector (i={i})\n"Query: what token {i} is looking for"',
+                       fontsize=11, weight='bold')
+        ax_qi.set_ylabel(f'i={i}', fontsize=10)
+        ax_qi.set_xlabel(f'{head_dim} dimensions →', fontsize=9)
+        ax_qi.set_yticks([0])
+        ax_qi.set_yticklabels([f'q_{i}'], fontsize=10)
+
+        # Emphasize the long, thin shape
+        ax_qi.text(0.5, -0.25, f'Shape: [1 × {head_dim}] ← LONG row vector',
+                  transform=ax_qi.transAxes, ha='center', fontsize=9,
+                  weight='bold', style='italic')
+
+        # k_j vector (long horizontal vector)
+        ax_kj = fig.add_subplot(gs[2, 2:4])
+        K_j_vector = K_matrix[j:j+1, :]  # Shape: [1, head_dim]
+        ax_kj.imshow(K_j_vector, aspect='auto', cmap='gray', alpha=0.8)
+        ax_kj.set_title(f'k_j vector (j={j})\n"Key: what token {j} contains"',
+                       fontsize=11, weight='bold')
+        ax_kj.set_ylabel(f'j={j}', fontsize=10)
+        ax_kj.set_xlabel(f'{head_dim} dimensions →', fontsize=9)
+        ax_kj.set_yticks([0])
+        ax_kj.set_yticklabels([f'k_{j}'], fontsize=10)
+
+        ax_kj.text(0.5, -0.25, f'Shape: [1 × {head_dim}] ← LONG row vector',
+                  transform=ax_kj.transAxes, ha='center', fontsize=9,
+                  weight='bold', style='italic')
+
+        # Dot product computation visualization
+        ax_dot = fig.add_subplot(gs[2, 4])
+        ax_dot.axis('off')
+
+        dot_text = (
+            f'Dot Product:\n'
+            f'q_i · k_j\n\n'
+            f'q_{i} · k_{j}\n'
+            f'= Σ(q_{i}[d] × k_{j}[d])\n'
+            f'  for d=0 to {head_dim-1}\n\n'
+            f'= {dot_product:.3f}\n\n'
+            f'Score = {dot_product:.3f}/√{head_dim}\n'
+            f'      = {scaled_score:.4f}'
+        )
+
+        ax_dot.text(0.5, 0.5, dot_text, ha='center', va='center',
+                   fontsize=9, family='monospace',
+                   bbox=dict(boxstyle='round,pad=0.8', facecolor='white',
+                            edgecolor='black', linewidth=2))
+
+        # ===== Arrow Row 2 =====
+        ax_arrow3 = fig.add_subplot(gs[3, :])
+        ax_arrow3.axis('off')
+        ax_arrow3.text(0.5, 0.5,
+                      f'This gives ONE attention score: How much token i={i} attends to token j={j}',
+                      ha='center', va='center', fontsize=11, weight='bold',
+                      bbox=dict(boxstyle='round,pad=0.5', facecolor='lightyellow',
+                               edgecolor='black', linewidth=1))
+
+        # ===== Bottom Row: Show the complete formula with i,j notation =====
+
+        ax_formula = fig.add_subplot(gs[4, :])
+        ax_formula.axis('off')
+
+        formula_text = (
+            f'ATTENTION MECHANISM EXPLAINED WITH i AND j:\n'
+            f'{"="*100}\n\n'
+            f'STEP 1: Matrix Structure (Top Row)\n'
+            f'  Q = [{num_tokens} × {head_dim}] matrix where row i contains q_i (query vector for token i)\n'
+            f'  K = [{num_tokens} × {head_dim}] matrix where row j contains k_j (key vector for token j)\n'
+            f'  K^T = [{head_dim} × {num_tokens}] transposed K matrix (shown in visualization)\n'
+            f'  Scores = Q @ K^T / √d_k = [{num_tokens} × {num_tokens}] matrix where entry (i,j) is Score(i,j)\n\n'
+            f'STEP 2: Extract vectors and compute ONE score (Middle Row)\n'
+            f'  • Extract q_i (row {i} from Q) - LONG vector with {head_dim} values\n'
+            f'  • Extract k_j (row {j} from K) - LONG vector with {head_dim} values\n'
+            f'  • Score(i,j) = q_i · k_j / √d_k\n'
+            f'              = (q_i[0]×k_j[0] + q_i[1]×k_j[1] + ... + q_i[{head_dim-1}]×k_j[{head_dim-1}]) / √{head_dim}\n'
+            f'              = {scaled_score:.4f} (shown in top-right matrix at position [{i},{j}])\n\n'
+            f'STEP 3: Do this for ALL pairs (i,j) to fill the entire Scores matrix\n'
+            f'  • For each query token i (each row), compute scores with all key tokens j (all columns)\n'
+            f'  • This creates the complete [{num_tokens} × {num_tokens}] Scores matrix shown in top-right\n\n'
+            f'STEP 4: Apply softmax and use values (not shown here)\n'
+            f'  • Attention(i,j) = softmax_j(Score(i,j)) - normalize each row\n'
+            f'  • Output_i = Σ_j Attention(i,j) × v_j - weighted sum using Value vectors\n\n'
+            f'KEY INSIGHTS:\n'
+            f'  • i = query token (asking "what should I attend to?"), j = key token (being considered)\n'
+            f'  • q_i and k_j are LONG vectors ({head_dim} dims) - shown as thin horizontal bars\n'
+            f'  • Each dot product q_i · k_j produces ONE scalar → fills one cell in Scores matrix\n'
+            f'  • The full Scores matrix comes from doing this for ALL (i,j) pairs'
+        )
+
+        ax_formula.text(0.05, 0.95, formula_text, ha='left', va='top',
+                       fontsize=9, family='monospace',
+                       bbox=dict(boxstyle='round,pad=1', facecolor='white',
+                                edgecolor='black', linewidth=2),
+                       transform=ax_formula.transAxes)
+
+        # Main title
+        fig.suptitle('Attention Mechanism: Understanding i (query) and j (key/value) Indexing',
+                    fontsize=14, weight='bold', y=0.97)
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
