@@ -376,7 +376,7 @@ with tab1:
 
             where $d_k$ is the head dimension.
 
-            The attention weights for token $i$ are: $\\text{Attention}(i,j) = \\text{softmax}\\left(\\frac{Q_i \\cdot K_j^T}{\\sqrt{d_k}}\\right)$
+            The attention weights for token $i$ are: $\\text{Attention}(i,j) = \\text{softmax}\\left(\\frac{Q_i \\cdot K_j}{\\sqrt{d_k}}\\right)$
 
             And the output for each token is: $\\text{Output}_i = \\sum_j \\text{Attention}(i,j) \\cdot V_j$
             """)
