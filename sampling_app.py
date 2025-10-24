@@ -298,8 +298,6 @@ sampling strategies transform these distributions.
 """)
 
 # Sidebar for configuration
-st.sidebar.header("⚙️ Configuration")
-
 # Use only the smaller TinyStories-8M model
 model_name = "roneneldan/TinyStories-8M"
 
@@ -308,18 +306,27 @@ if st.session_state.extractor is None:
     with st.spinner(f"Loading {model_name}..."):
         try:
             st.session_state.extractor = AttentionExtractor(model_name=model_name)
-            st.sidebar.success(f"✓ Model loaded successfully")
         except Exception as e:
             st.sidebar.error(f"Failed to load model: {str(e)}")
             st.session_state.extractor = None
 
 # Prompt input in sidebar
 st.sidebar.markdown("---")
+
+with st.sidebar.expander("ℹ️ How to use", expanded=False):
+    st.markdown("""
+    **1.** Edit the **prompt** below
+
+    **2.** Adjust **sampling parameters** (Temperature, Top-K, Top-P)
+
+    **3.** Use the **step slider** to explore each token generation
+    """)
+
 st.sidebar.subheader("📝 Prompt")
 
 prompt = st.sidebar.text_area(
     "Enter your prompt",
-    value="There was a little girl who",
+    value="There was a little dragon who",
     height=100,
     key="prompt_input",
     label_visibility="collapsed"
@@ -354,7 +361,7 @@ top_k = st.sidebar.slider(
     "Number of top tokens to consider",
     min_value=0,
     max_value=100,
-    value=0,
+    value=10,
     step=5,
     help="0 = disabled, otherwise only consider top K tokens",
     key="topk_slider",
@@ -416,11 +423,9 @@ with st.sidebar.expander("💡 How It Works", expanded=False):
     """)
 
 # Main content tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Visualization", "⚖️ Comparison", "📚 Learn More", "ℹ️ Model Info"])
+tab1, tab3, tab4 = st.tabs(["📊 Visualization", "📚 Learn More", "ℹ️ Model Info"])
 
 with tab1:
-    st.header("Interactive Sampling Visualization")
-
     # Auto-generate on slider changes or button click
     current_params = (prompt, temperature, top_k, top_p, max_tokens)
     slider_params = (temperature, top_k, top_p, max_tokens)
@@ -486,17 +491,8 @@ with tab1:
         step_info['top_k'] = top_k if top_k > 0 else "∞"
         step_info['top_p'] = top_p
 
-        # Create two columns: plots on left, text on right
-        col_plot, col_text = st.columns([2, 1])
-
-        with col_plot:
-            # Plot distributions
-            fig = plot_probability_distributions(step_info, num_top_tokens=20)
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-            buf.seek(0)
-            st.image(buf, use_container_width=True)
-            plt.close()
+        # Create two columns: text on left, plots on right
+        col_text, col_plot = st.columns([1, 2])
 
         with col_text:
             st.markdown("### Generated Text")
@@ -506,7 +502,7 @@ with tab1:
             all_tokens = [step['token'] for step in result['steps']]
 
             # Create HTML with selected token in red
-            html_text = "<p style='font-size: 16px; line-height: 1.8;'>"
+            html_text = "<p style='font-size: 20px; line-height: 1.8;'>"
 
             # Add prompt first (not highlighted)
             html_text += f"{result['prompt']} "
@@ -531,97 +527,105 @@ with tab1:
 
             st.markdown("---")
             st.markdown("**Top alternatives:**")
-            for token, prob in step_info['top_tokens'][:5]:
-                if token == step_info['token']:
-                    st.markdown(f"<span style='color: red; font-weight: bold;'>• \"{token}\" - {prob:.4f}</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"• \"{token}\" - {prob:.4f}")
+            alternatives = [(token, prob) for token, prob in step_info['top_tokens'] if token != step_info['token']]
+            for token, prob in alternatives[:5]:
+                st.markdown(f"• \"{token}\" - {prob:.4f}")
+
+        with col_plot:
+            # Plot distributions
+            fig = plot_probability_distributions(step_info, num_top_tokens=20)
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            st.image(buf, use_container_width=True)
+            plt.close()
 
     elif st.session_state.extractor is None:
         st.info("⏳ Loading model, please wait...")
     elif not prompt:
         st.info("👆 Enter a prompt in the sidebar to begin")
 
-with tab2:
-    st.header("Compare Different Sampling Configurations")
-
-    st.markdown("""
-    Generate text with multiple sampling configurations and compare the results side-by-side.
-    """)
-
-    # Comparison prompt
-    comparison_prompt = st.text_input(
-        "Prompt for comparison",
-        value="Once upon a time",
-        key="comparison_prompt"
-    )
-
-    # Predefined configurations
-    st.subheader("Select Configurations to Compare")
-
-    configs = {
-        "Greedy (temp=0.1)": {"temperature": 0.1, "top_k": 0, "top_p": 1.0},
-        "Balanced (temp=1.0)": {"temperature": 1.0, "top_k": 0, "top_p": 1.0},
-        "Creative (temp=1.5)": {"temperature": 1.5, "top_k": 0, "top_p": 1.0},
-        "Top-K 50": {"temperature": 1.0, "top_k": 50, "top_p": 1.0},
-        "Top-P 0.9": {"temperature": 1.0, "top_k": 0, "top_p": 0.9},
-        "Top-K 40 + Top-P 0.95": {"temperature": 1.0, "top_k": 40, "top_p": 0.95},
-    }
-
-    selected_configs = st.multiselect(
-        "Choose configurations",
-        options=list(configs.keys()),
-        default=list(configs.keys())[:3]
-    )
-
-    comparison_max_tokens = st.slider(
-        "Max tokens for comparison",
-        min_value=10,
-        max_value=50,
-        value=20,
-        key="comparison_max_tokens"
-    )
-
-    if st.button("Generate Comparisons", type="primary", key="compare_button"):
-        if not comparison_prompt:
-            st.error("Please enter a prompt")
-        elif st.session_state.extractor is None:
-            st.error("Please load a model first")
-        elif not selected_configs:
-            st.error("Please select at least one configuration")
-        else:
-            with st.spinner("Generating comparisons..."):
-                try:
-                    comparison_results = {}
-
-                    for config_name in selected_configs:
-                        config = configs[config_name]
-                        result = generate_with_sampling_visualization(
-                            extractor=st.session_state.extractor,
-                            prompt=comparison_prompt,
-                            temperature=config['temperature'],
-                            top_k=config['top_k'],
-                            top_p=config['top_p'],
-                            max_new_tokens=comparison_max_tokens,
-                            num_tokens_to_visualize=20
-                        )
-                        comparison_results[config_name] = result
-
-                    st.session_state.comparison_results = comparison_results
-
-                    # Display results
-                    st.header("Comparison Results")
-
-                    for config_name, result in comparison_results.items():
-                        st.subheader(config_name)
-                        st.info(f"**Generated:** {result['generated_text']}")
-                        st.caption(f"Tokens: {len(result['steps'])} | Temp: {result['temperature']} | Top-K: {result['top_k']} | Top-P: {result['top_p']}")
-                        st.markdown("---")
-
-                except Exception as e:
-                    st.error(f"Error during comparison: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
+# with tab2:
+#     st.header("Compare Different Sampling Configurations")
+#
+#     st.markdown("""
+#     Generate text with multiple sampling configurations and compare the results side-by-side.
+#     """)
+#
+#     # Comparison prompt
+#     comparison_prompt = st.text_input(
+#         "Prompt for comparison",
+#         value="Once upon a time",
+#         key="comparison_prompt"
+#     )
+#
+#     # Predefined configurations
+#     st.subheader("Select Configurations to Compare")
+#
+#     configs = {
+#         "Greedy (temp=0.1)": {"temperature": 0.1, "top_k": 0, "top_p": 1.0},
+#         "Balanced (temp=1.0)": {"temperature": 1.0, "top_k": 0, "top_p": 1.0},
+#         "Creative (temp=1.5)": {"temperature": 1.5, "top_k": 0, "top_p": 1.0},
+#         "Very Creative (temp=2.0, top-k=100)": {"temperature": 2.0, "top_k": 100, "top_p": 1.0},
+#         "Top-K 50": {"temperature": 1.0, "top_k": 50, "top_p": 1.0},
+#         "Top-P 0.9": {"temperature": 1.0, "top_k": 0, "top_p": 0.9},
+#         "Top-K 40 + Top-P 0.95": {"temperature": 1.0, "top_k": 40, "top_p": 0.95},
+#     }
+#
+#     selected_configs = st.multiselect(
+#         "Choose configurations",
+#         options=list(configs.keys()),
+#         default=list(configs.keys())[:3]
+#     )
+#
+#     comparison_max_tokens = st.slider(
+#         "Max tokens for comparison",
+#         min_value=10,
+#         max_value=50,
+#         value=20,
+#         key="comparison_max_tokens"
+#     )
+#
+#     if st.button("Generate Comparisons", type="primary", key="compare_button"):
+#         if not comparison_prompt:
+#             st.error("Please enter a prompt")
+#         elif st.session_state.extractor is None:
+#             st.error("Please load a model first")
+#         elif not selected_configs:
+#             st.error("Please select at least one configuration")
+#         else:
+#             with st.spinner("Generating comparisons..."):
+#                 try:
+#                     comparison_results = {}
+#
+#                     for config_name in selected_configs:
+#                         config = configs[config_name]
+#                         result = generate_with_sampling_visualization(
+#                             extractor=st.session_state.extractor,
+#                             prompt=comparison_prompt,
+#                             temperature=config['temperature'],
+#                             top_k=config['top_k'],
+#                             top_p=config['top_p'],
+#                             max_new_tokens=comparison_max_tokens,
+#                             num_tokens_to_visualize=20
+#                         )
+#                         comparison_results[config_name] = result
+#
+#                     st.session_state.comparison_results = comparison_results
+#
+#                     # Display results
+#                     st.header("Comparison Results")
+#
+#                     for config_name, result in comparison_results.items():
+#                         st.subheader(config_name)
+#                         st.info(f"**Generated:** {result['generated_text']}")
+#                         st.caption(f"Tokens: {len(result['steps'])} | Temp: {result['temperature']} | Top-K: {result['top_k']} | Top-P: {result['top_p']}")
+#                         st.markdown("---")
+#
+#                 except Exception as e:
+#                     st.error(f"Error during comparison: {str(e)}")
+#                     import traceback
+#                     st.code(traceback.format_exc())
 
 with tab4:
     st.header("Model Information")
@@ -784,18 +788,4 @@ with tab3:
     - **Top-P (Nucleus) Sampling**: Holtzman et al. (2019) - "The Curious Case of Neural Text Degeneration"
     - **Temperature Scaling**: Hinton et al. (2015) - "Distilling the Knowledge in a Neural Network"
 
-    ---
-
-    ### 💡 Try It Yourself!
-
-    Use the **Interactive Visualization** tab to see how these parameters affect the probability
-    distributions in real-time. Experiment with different combinations and observe how the model's
-    behavior changes!
     """)
-
-# Footer
-st.markdown("---")
-st.markdown("""
-**About this app:** This visualization tool helps you understand how LLM sampling parameters work
-by showing the probability distributions at each generation step. Built with Streamlit and HuggingFace Transformers.
-""")
