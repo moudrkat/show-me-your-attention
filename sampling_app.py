@@ -294,7 +294,7 @@ st.markdown("""
 Explore how **Temperature**, **Top-K**, and **Top-P** sampling parameters affect text generation!
 
 This app visualizes the probability distributions at each generation step and shows how different
-sampling strategies transform these distributions.
+parameter settings transform these distributions.
 """)
 
 # Sidebar for configuration
