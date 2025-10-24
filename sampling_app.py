@@ -311,8 +311,6 @@ if st.session_state.extractor is None:
             st.session_state.extractor = None
 
 # Prompt input in sidebar
-st.sidebar.markdown("---")
-
 with st.sidebar.expander("ℹ️ How to use", expanded=False):
     st.markdown("""
     **1.** Edit the **prompt** below
@@ -327,7 +325,7 @@ st.sidebar.subheader("📝 Prompt")
 prompt = st.sidebar.text_area(
     "Enter your prompt",
     value="There was a little dragon who",
-    height=100,
+    height=60,
     key="prompt_input",
     label_visibility="collapsed"
 )
@@ -502,7 +500,7 @@ with tab1:
             all_tokens = [step['token'] for step in result['steps']]
 
             # Create HTML with selected token in red
-            html_text = "<p style='font-size: 20px; line-height: 1.8;'>"
+            html_text = "<p style='font-size: 20px; line-height: 1.8; font-weight: bold;'>"
 
             # Add prompt first (not highlighted)
             html_text += f"{result['prompt']} "
@@ -527,7 +525,7 @@ with tab1:
 
             st.markdown("---")
             st.markdown("**Top alternatives:**")
-            alternatives = [(token, prob) for token, prob in step_info['top_tokens'] if token != step_info['token']]
+            alternatives = [(token, prob) for token, prob in step_info['top_tokens'] if token != step_info['token'] and prob > 0]
             for token, prob in alternatives[:5]:
                 st.markdown(f"• \"{token}\" - {prob:.4f}")
 
