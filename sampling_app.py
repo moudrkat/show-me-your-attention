@@ -715,6 +715,15 @@ with tab3:
 
     **What it does:** Restricts sampling to the K most likely tokens at each step.
 
+    **Mathematical formulation:**
+
+    Let V_K be the set of top-K tokens. The filtered probability is:
+
+    - P'(x_i) = P(x_i) if x_i ∈ V_K
+    - P'(x_i) = 0 otherwise
+
+    Then renormalize by dividing by the sum over V_K tokens.
+
     **Algorithm:**
     1. Sort all tokens by probability
     2. Keep only the top K tokens
@@ -741,6 +750,14 @@ with tab3:
     ### 🎯 Top-P (Nucleus) Sampling
 
     **What it does:** Dynamically selects the smallest set of tokens whose cumulative probability exceeds P.
+
+    **Mathematical formulation:**
+
+    Define the nucleus V_P as the smallest set where the cumulative probability ≥ p (tokens sorted by descending probability).
+
+    The final probability becomes:
+    - P_top-p(x_i) = P(x_i) / Σ(P(x_j) for j ∈ V_P) if x_i ∈ V_P
+    - P_top-p(x_i) = 0 otherwise
 
     **Algorithm:**
     1. Sort tokens by probability (descending)
@@ -780,12 +797,5 @@ with tab3:
     - **Creative**: temp=1.3, top-k=0, top-p=0.95
     - **Very Creative**: temp=1.5, top-k=100, top-p=1.0
 
-    ---
-
-    ### 📚 References
-
-    - **Top-K Sampling**: Fan et al. (2018) - "Hierarchical Neural Story Generation"
-    - **Top-P (Nucleus) Sampling**: Holtzman et al. (2019) - "The Curious Case of Neural Text Degeneration"
-    - **Temperature Scaling**: Hinton et al. (2015) - "Distilling the Knowledge in a Neural Network"
 
     """)
