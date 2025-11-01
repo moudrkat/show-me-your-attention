@@ -22,7 +22,7 @@ if 'vocab' not in st.session_state:
     st.session_state.vocab = None
 
 # Main title
-st.title("🔮 Embedding Space Explorer")
+st.title("🔮 ...Once upon a time, finally see 256-dimensional embeddings and lose your words.")
 st.markdown("*Explore TinyStories-8M word embeddings*")
 
 # Load model automatically on first run
