@@ -8,7 +8,7 @@ from src.model_loader import AttentionExtractor
 
 # Page configuration
 st.set_page_config(
-    page_title="Embedding Explorer",
+    page_title="...Once upon a time, finally see 256-dimensional embeddings and lose your words.",
     page_icon="🔮",
     layout="wide"
 )
@@ -24,7 +24,6 @@ if 'vocab' not in st.session_state:
 # Main title
 st.title("🔮 Embedding Space Explorer")
 st.markdown("*Explore TinyStories-8M word embeddings*")
-st.markdown("...Once upon a time, finally see 256-dimensional embeddings and lose your words.")
 
 # Load model automatically on first run
 if st.session_state.extractor is None:
