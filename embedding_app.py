@@ -1,13 +1,9 @@
 import streamlit as st
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 import plotly.graph_objects as go
-import plotly.express as px
 from src.model_loader import AttentionExtractor
 
 # Page configuration
@@ -73,12 +69,256 @@ if st.session_state.extractor is not None:
     comparison_words = [w.strip() for w in comparison_words_input.split(',') if w.strip()]
     all_selected_words = [target_word] + comparison_words
 
+    # Show embedding vectors for selected words
+    selected_embeddings = []
+    if len(all_selected_words) > 0:
+        st.subheader("Embedding Vectors")
+        try:
+            for word in all_selected_words:
+                token_id = st.session_state.extractor.tokenizer.encode(word, add_special_tokens=False)[0]
+                emb = st.session_state.embeddings[token_id]
+                selected_embeddings.append(emb)
+
+                is_target = word == target_word
+                if is_target:
+                    st.markdown(f"**🎯 {word}** (target) - 𝐮:")
+                else:
+                    st.markdown(f"**{word}** - 𝐯:")
+
+                st.code(f"[{', '.join([f'{v:.3f}' for v in emb])}]", language=None)
+        except Exception as e:
+            st.warning(f"Could not load embeddings: {e}")
+
+    # --- Similarity Analysis (doesn't depend on PCA) ---
+    if len(selected_embeddings) > 1 and len(all_selected_words) > 1:
+        st.markdown("---")
+        st.subheader("Similarity Analysis: Which word is nearest to the target?")
+        st.caption(
+            f"Target word: **{all_selected_words[0]}** | Comparison words: {', '.join(all_selected_words[1:])}")
+
+        from scipy.spatial.distance import cdist
+
+        # --- Compute metrics ---
+        selected_embeddings_array = np.array(selected_embeddings)
+        results = {
+            "Cosine Similarity": {
+                'data': cosine_similarity(selected_embeddings),
+                'cmap': 'YlOrRd', 'vmin': 0, 'vmax': 1,
+                'note': 'higher = more similar', 'format': '.3f',
+                'higher_is_closer': True
+            },
+            "Euclidean Distance": {
+                'data': euclidean_distances(selected_embeddings),
+                'cmap': 'YlGnBu', 'note': 'lower = more similar',
+                'format': '.1f', 'higher_is_closer': False
+            },
+            "Manhattan Distance": {
+                'data': cdist(selected_embeddings_array, selected_embeddings_array, metric='cityblock'),
+                'cmap': 'Purples', 'note': 'lower = more similar',
+                'format': '.1f', 'higher_is_closer': False
+            },
+            "Dot Product": {
+                'data': selected_embeddings_array @ selected_embeddings_array.T,
+                'cmap': 'RdYlGn', 'note': 'higher = more similar',
+                'format': '.1f', 'higher_is_closer': True
+            },
+            "Chebyshev Distance": {
+                'data': cdist(selected_embeddings_array, selected_embeddings_array, metric='chebyshev'),
+                'cmap': 'Oranges', 'note': 'lower = more similar',
+                'format': '.2f', 'higher_is_closer': False
+            }
+        }
+
+        explanations = {
+            "Cosine Similarity": {
+                "desc": "Measures the cosine of the angle between vectors. Range [0, 1] for positive embeddings.",
+                "note": "1 = identical direction, 0 = orthogonal, -1 = opposite",
+                "equation": r"\text{cosine}(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|\|\mathbf{v}\|}"
+            },
+            "Euclidean Distance": {
+                "desc": "L2 norm - straight-line distance between points.",
+                "note": "Most common distance metric",
+                "equation": r"d_{\text{Euc}}(\mathbf{u}, \mathbf{v}) = \sqrt{\sum (u_i - v_i)^2}"
+            },
+            "Manhattan Distance": {
+                "desc": "L1 norm - sum of absolute differences.",
+                "note": "Also called 'taxicab' distance",
+                "equation": r"d_{\text{Man}}(\mathbf{u}, \mathbf{v}) = \sum |u_i - v_i|"
+            },
+            "Dot Product": {
+                "desc": "Raw inner product without normalization.",
+                "note": "Similar to cosine but magnitude-dependent",
+                "equation": r"\mathbf{u}\cdot\mathbf{v} = \sum u_i v_i"
+            },
+            "Chebyshev Distance": {
+                "desc": "L∞ norm - maximum difference along any single dimension.",
+                "note": "Also called 'infinity norm'",
+                "equation": r"d_{\text{Cheb}}(\mathbf{u}, \mathbf{v}) = \max |u_i - v_i|"
+            }
+        }
+
+        # --- Show results horizontally with explanations underneath ---
+        num_cols = 5  # number of plots per row
+        metrics_list = list(results.items())
+
+        for row_start in range(0, len(metrics_list), num_cols):
+            cols = st.columns(num_cols)
+
+            for i, (metric_name, metric_info) in enumerate(metrics_list[row_start: row_start + num_cols]):
+                with cols[i]:
+                    data = metric_info['data']
+                    target_row = data[0, 1:]
+                    if metric_info['higher_is_closer']:
+                        nearest_idx = np.argmax(target_row) + 1
+                    else:
+                        nearest_idx = np.argmin(target_row) + 1
+                    nearest_word = all_selected_words[nearest_idx]
+
+                    # --- Plot ---
+                    fig_single, ax = plt.subplots(figsize=(5, 4))
+                    im = ax.imshow(data, cmap=metric_info['cmap'],
+                                   vmin=metric_info.get('vmin'),
+                                   vmax=metric_info.get('vmax'))
+                    ax.set_xticks(range(len(all_selected_words)))
+                    ax.set_yticks(range(len(all_selected_words)))
+                    ax.set_xticklabels(all_selected_words, rotation=45, ha='right')
+                    ax.set_yticklabels(all_selected_words)
+                    ax.set_title(metric_name, fontsize=12, fontweight='bold')
+                    plt.colorbar(im, ax=ax)
+
+                    # Annotate
+                    for r in range(len(all_selected_words)):
+                        for c in range(len(all_selected_words)):
+                            val = format(data[r, c], metric_info['format'])
+                            ax.text(c, r, val, ha='center', va='center', color='black', fontsize=9)
+                    plt.tight_layout()
+                    st.pyplot(fig_single)
+                    st.success(f"🎯 Nearest to **{all_selected_words[0]}**: **{nearest_word}**")
+
+                    # --- Explanation below each plot ---
+                    if metric_name in explanations:
+                        exp = explanations[metric_name]
+                        st.markdown(f"**{exp['desc']}**")
+                        st.caption(f"*{exp['note']}*")
+                        st.latex(exp['equation'])
+
+                        # --- Show numerical calculation example ---
+                        with st.expander("🔢 See full calculation with numbers"):
+                            # Calculate for target vs nearest comparison word
+                            target_vec = selected_embeddings_array[0]
+                            comp_vec = selected_embeddings_array[nearest_idx]
+
+                            st.markdown(f"**Example: {all_selected_words[0]} vs {nearest_word}**")
+                            st.markdown(f"**Variable mapping:**")
+                            st.latex(rf"\mathbf{{u}} = \text{{{all_selected_words[0]}}}, \quad \mathbf{{v}} = \text{{{nearest_word}}}")
+
+                            st.caption(f"Total embedding dimension: {len(target_vec)}")
+
+                            # Always show all dimensions
+                            n_show = len(target_vec)
+
+                            # Show vectors
+                            st.markdown(f"**All {n_show} dimensions:**")
+                            st.code(f"𝐮 ({all_selected_words[0]}): [{', '.join([f'{v:.3f}' for v in target_vec])}]")
+                            st.code(f"𝐯 ({nearest_word}): [{', '.join([f'{v:.3f}' for v in comp_vec])}]")
+
+                            if metric_name == "Cosine Similarity":
+                                dot_prod = np.dot(target_vec, comp_vec)
+                                norm_target = np.linalg.norm(target_vec)
+                                norm_comp = np.linalg.norm(comp_vec)
+                                result = dot_prod / (norm_target * norm_comp)
+
+                                st.markdown("**Calculation:**")
+                                st.latex(rf"\mathbf{{u}} \cdot \mathbf{{v}} = \sum_{{i=1}}^{{{len(target_vec)}}} u_i v_i = {dot_prod:.6f}")
+                                st.latex(rf"\|\mathbf{{u}}\| = \sqrt{{\sum_{{i=1}}^{{{len(target_vec)}}} u_i^2}} = {norm_target:.6f}")
+                                st.latex(rf"\|\mathbf{{v}}\| = \sqrt{{\sum_{{i=1}}^{{{len(target_vec)}}} v_i^2}} = {norm_comp:.6f}")
+                                st.latex(rf"\text{{cosine}}(\mathbf{{u}}, \mathbf{{v}}) = \frac{{{dot_prod:.6f}}}{{{norm_target:.6f} \times {norm_comp:.6f}}} = {result:.6f}")
+
+                            elif metric_name == "Euclidean Distance":
+                                diff = target_vec - comp_vec
+                                squared_diff = diff ** 2
+                                sum_squared = np.sum(squared_diff)
+                                result = np.sqrt(sum_squared)
+
+                                st.markdown("**Calculation:**")
+                                st.latex(rf"\sum_{{i=1}}^{{{len(target_vec)}}} (u_i - v_i)^2 = {sum_squared:.6f}")
+                                st.latex(rf"d_{{Euc}} = \sqrt{{{sum_squared:.6f}}} = {result:.6f}")
+
+                            elif metric_name == "Manhattan Distance":
+                                diff = np.abs(target_vec - comp_vec)
+                                result = np.sum(diff)
+
+                                st.markdown("**Calculation:**")
+                                st.latex(rf"d_{{Man}} = \sum_{{i=1}}^{{{len(target_vec)}}} |u_i - v_i| = {result:.6f}")
+
+                            elif metric_name == "Dot Product":
+                                products = target_vec * comp_vec
+                                result = np.sum(products)
+
+                                st.markdown("**Calculation:**")
+                                st.latex(rf"\mathbf{{u}} \cdot \mathbf{{v}} = \sum_{{i=1}}^{{{len(target_vec)}}} u_i v_i = {result:.6f}")
+
+                            elif metric_name == "Chebyshev Distance":
+                                diff = np.abs(target_vec - comp_vec)
+                                result = np.max(diff)
+                                max_idx = np.argmax(diff)
+
+                                st.markdown("**Calculation:**")
+                                st.latex(rf"d_{{Cheb}} = \max_{{i}} |u_i - v_i| = |u_{{{max_idx}}} - v_{{{max_idx}}}| = {result:.6f}")
+                                st.caption(f"Maximum difference at dimension {max_idx}: |{target_vec[max_idx]:.3f} - {comp_vec[max_idx]:.3f}| = {result:.6f}")
+
+                            st.success(f"✅ Final result: **{data[0, nearest_idx]:.6f}**")
+
+    st.markdown("---")
+
+    # Unified word range slider for both tabs
+    st.subheader("Select Vocabulary Range")
+
+    # Checkbox for clean vs all vocabulary
+    use_clean_vocab = st.checkbox(
+        "Use clean vocabulary only (alphabetic words, no special tokens)",
+        value=True,
+        help="When checked, only shows alphabetic words without special tokens. Uncheck to see all tokens including special characters."
+    )
+
+    # Build vocabulary list based on checkbox
+    vocab_size = len(st.session_state.vocab)
+
+    if use_clean_vocab:
+        words_list = []
+        for idx in range(vocab_size):
+            word = st.session_state.vocab[idx].strip()
+            word_clean = word.replace('Ġ', '')
+            if (len(word_clean) > 0 and
+                    word_clean.replace('-', '').replace("'", '').isalpha() and
+                    len(word_clean) <= 15 and
+                    not word.startswith('<') and not word.startswith('[') and
+                    not word.startswith('|')):
+                words_list.append(word_clean)
+    else:
+        # All vocabulary (raw tokens)
+        words_list = [st.session_state.vocab[idx].strip().replace('Ġ', '') for idx in range(vocab_size)]
+
+    total_words = len(words_list)
+    vocab_type = "clean vocabulary" if use_clean_vocab else "all tokens"
+
+    start_idx, end_idx = st.slider(
+        f"Word range (from {vocab_type})",
+        min_value=0,
+        max_value=max(1, total_words - 1),
+        value=(0, min(1000, total_words - 1)),  # Default to 1000 words
+        step=1,
+        help=f"Select which part of the {vocab_type} to use for visualizations"
+    )
+
+    # Store for use in tabs
+    clean_words_all = words_list
+
     st.markdown("---")
 
     # Create tabs
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab3 = st.tabs([
         "🌐 Embedding Space",
-        "🌊 Layer Evolution",
         "📊 Embedding Matrix"
     ])
 
@@ -87,84 +327,87 @@ if st.session_state.extractor is not None:
     # ========================================
     with tab3:
         st.header("Embedding Matrix Heatmap")
-        st.info("Visualize the full embedding matrix. All words will be labeled. Scroll to explore!")
+        st.info(f"Showing words {start_idx:,} to {end_idx:,} from the vocabulary range selected above.")
 
-        # Options
-        col1, col2 = st.columns(2)
-        with col1:
-            n_words = st.number_input(
-                "Number of words to show (0 = all vocabulary)",
-                min_value=0,
-                max_value=50000,
-                value=100,
-                step=50,
-                help="More words = bigger plot. 0 shows everything!"
-            )
-        with col2:
-            show_clean_only = st.checkbox("Show only clean words (no symbols)", value=True)
+        with st.spinner("Generating embedding matrix visualization..."):
+                # --- Get selected words embeddings ---
+                selected_words_info = []
+                for word in all_selected_words:
+                    try:
+                        token_id = st.session_state.extractor.tokenizer.encode(word, add_special_tokens=False)[0]
+                        emb = st.session_state.embeddings[token_id]
+                        selected_words_info.append({
+                            'word': word,
+                            'token_id': token_id,
+                            'embedding': emb,
+                            'is_target': word == target_word
+                        })
+                    except:
+                        st.warning(f"Could not find word: {word}")
 
-        if st.button("Generate Matrix Heatmap", key="matrix_heatmap_btn"):
-            with st.spinner("Generating embedding matrix visualization..."):
-                vocab_size = len(st.session_state.vocab)
+                # Apply the range slice for background words
+                words_to_use = clean_words_all[start_idx:end_idx + 1]
+                # Get actual token indices for these words
+                indices_to_use = []
+                for word in words_to_use:
+                    for idx, vocab_word in st.session_state.vocab.items():
+                        if vocab_word.strip().replace('Ġ', '') == word:
+                            indices_to_use.append(idx)
+                            break
+                embeddings_background = st.session_state.embeddings[indices_to_use, :]
 
-                if show_clean_only:
-                    # Filter to clean words only
-                    clean_indices = []
-                    clean_words = []
-                    for idx in range(vocab_size):
-                        word = st.session_state.vocab[idx].strip()
-                        word_clean = word.replace('Ġ', '')
-                        if (len(word_clean) > 0 and
-                            word_clean.replace('-', '').replace("'", '').isalpha() and
-                            len(word_clean) <= 15 and
-                            not word.startswith('<') and not word.startswith('[') and
-                            not word.startswith('|')):
-                            clean_indices.append(idx)
-                            clean_words.append(word_clean)
-                            if n_words > 0 and len(clean_indices) >= n_words:
-                                break
+                # Combine selected words (at bottom) with background range
+                if len(selected_words_info) > 0:
+                    selected_embeddings = np.array([info['embedding'] for info in selected_words_info])
+                    # Make selected words bold
+                    selected_word_labels = [f"<b>{info['word']}</b>" for info in selected_words_info]
 
-                    indices_to_use = clean_indices
-                    words_to_use = clean_words
+                    # Stack: background words first, then selected words at bottom
+                    embeddings_to_viz = np.vstack([embeddings_background, selected_embeddings])
+                    y_labels = words_to_use + selected_word_labels
                 else:
-                    # Use all words
-                    if n_words > 0:
-                        indices_to_use = list(range(min(n_words, vocab_size)))
-                    else:
-                        indices_to_use = list(range(vocab_size))
-                    words_to_use = [st.session_state.vocab[idx].strip().replace('Ġ', '') for idx in indices_to_use]
+                    embeddings_to_viz = embeddings_background
+                    y_labels = words_to_use
 
-                embeddings_to_viz = st.session_state.embeddings[indices_to_use]
+                n_selected = len(selected_words_info)
+                st.info(
+                    f"Showing **{n_selected} selected words** (highlighted) + words {start_idx}–{end_idx} ({len(words_to_use)} words) × {embeddings_to_viz.shape[1]} dimensions = {embeddings_to_viz.size:,} values"
+                )
 
-                st.info(f"Visualizing {len(indices_to_use)} words × {embeddings_to_viz.shape[1]} dimensions = {embeddings_to_viz.size:,} values")
-
-                # Create interactive Plotly heatmap
-                # Make height proportional to number of words (15 pixels per word for readability)
-                pixels_per_word = 15
-                plot_height = len(indices_to_use) * pixels_per_word
-
+                # --- Plot setup ---
+                # Use larger pixels per word to ensure visibility
+                pixels_per_word = 20
+                plot_height = len(y_labels) * pixels_per_word
                 st.warning(f"⚠️ Creating plot: {plot_height:,} pixels tall. Scroll to explore!")
 
+                # Use percentile-based color scaling for better contrast
+                vmin, vmax = np.percentile(embeddings_to_viz, [5, 95])
+
+                # Use Viridis colorscale
                 fig = go.Figure(data=go.Heatmap(
                     z=embeddings_to_viz,
                     x=[f"D{i}" for i in range(embeddings_to_viz.shape[1])],
-                    y=words_to_use,
+                    y=y_labels,
                     colorscale='Viridis',
+                    zmin=vmin,
+                    zmax=vmax,
                     hovertemplate='Word: %{y}<br>Dimension: %{x}<br>Value: %{z:.3f}<extra></extra>',
-                    colorbar=dict(title="Embedding Value")
+                    colorbar=dict(title="Embedding Value"),
+                    xgap=0,  # No gap between cells
+                    ygap=0   # No gap between cells
                 ))
 
                 fig.update_layout(
-                    title=f"Embedding Matrix: {len(indices_to_use)} Words × {embeddings_to_viz.shape[1]} Dimensions",
+                    title=f"Embedding Matrix: {n_selected} Selected Words + Background Range {start_idx}–{end_idx}",
                     xaxis_title="Embedding Dimension",
                     yaxis_title="Word (Vocabulary)",
-                    height=plot_height,  # HUGE height so all words are readable
+                    height=plot_height,
                     width=1400,
                     yaxis=dict(
                         tickmode='linear',
                         tick0=0,
-                        dtick=1,  # Show EVERY word
-                        tickfont=dict(size=10)
+                        dtick=1,
+                        tickfont=dict(size=10)  # Remove color='black' for dark mode compatibility
                     ),
                     xaxis=dict(
                         tickfont=dict(size=10)
@@ -173,7 +416,7 @@ if st.session_state.extractor is not None:
 
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Show some statistics
+                # --- Statistics ---
                 st.subheader("Matrix Statistics")
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
@@ -195,161 +438,170 @@ if st.session_state.extractor is not None:
         Select words to highlight and analyze their similarities.
         """)
 
-        # Dimensionality reduction method
-        reduction_method = st.radio(
-            "Dimensionality reduction method",
-            ["PCA", "t-SNE"],
-            horizontal=True,
-            help="PCA is faster, t-SNE can reveal more structure"
-        )
+        # Expander for PCA explanation
+        with st.expander("📖 How PCA Works - Complete Explanation"):
+            st.markdown("### Principal Component Analysis (PCA)")
 
-        # Precompute embedding space visualization
-        cache_key = f'embedding_space_2d_{reduction_method}'
+            st.markdown("**Goal:** Find the directions (principal components) of maximum variance in high-dimensional data")
+
+            st.markdown("---")
+            st.markdown("#### Step 1: Center the Data")
+            st.latex(r"\bar{\mathbf{X}} = \mathbf{X} - \frac{1}{n}\sum_{i=1}^{n} \mathbf{x}_i")
+            st.markdown(r"Subtract the mean to center data at the origin")
+
+            st.markdown("#### Step 2: Compute Covariance Matrix")
+            st.latex(r"\mathbf{\Sigma} = \frac{1}{n-1} \bar{\mathbf{X}}^T \bar{\mathbf{X}}")
+            st.markdown(r"where $\mathbf{\Sigma} \in \mathbb{R}^{d \times d}$ captures how dimensions vary together")
+
+            st.markdown("#### Step 3: Eigendecomposition")
+            st.latex(r"\mathbf{\Sigma} \mathbf{w}_i = \lambda_i \mathbf{w}_i")
+            st.markdown(r"Find eigenvectors $\mathbf{w}_i$ (principal components) and eigenvalues $\lambda_i$ (variance explained)")
+
+            st.markdown("#### Step 4: Project to 2D")
+            st.latex(r"\mathbf{Z} = \bar{\mathbf{X}} \mathbf{W}")
+            st.markdown(r"where $\mathbf{W} = [\mathbf{w}_1, \mathbf{w}_2] \in \mathbb{R}^{d \times 2}$ contains the top 2 eigenvectors, and $\mathbf{Z} \in \mathbb{R}^{n \times 2}$ are the 2D coordinates")
+
+            st.markdown("---")
+            st.markdown("#### Variance Explained")
+            st.markdown(r"The fraction of total variance captured by PC$i$:")
+            st.latex(r"\text{Var. Explained}_i = \frac{\lambda_i}{\sum_{j=1}^{d} \lambda_j}")
+            st.markdown("Higher percentages mean the 2D visualization preserves more information from the original high-dimensional space")
+
+            st.markdown("---")
+            st.markdown("#### Key Properties")
+            st.markdown("""
+            - **Linear transformation:** Can project new points without refitting
+            - **Orthogonal components:** PC1 ⊥ PC2 (uncorrelated)
+            - **Deterministic:** Same data → same result every time
+            - **Global structure:** Preserves large-scale relationships
+            - **Optimal reconstruction:** Minimizes squared reconstruction error
+            """)
+
+        # Use PCA only
+        reduction_method = "PCA"
+
+        # Cache key depends on slider range and vocabulary type (not selected words)
+        vocab_cache_key = "clean" if use_clean_vocab else "all"
+        cache_key = f'embedding_space_2d_{reduction_method}_{vocab_cache_key}_{start_idx}_{end_idx}'
+
         if cache_key not in st.session_state:
-            with st.spinner(f"Computing 2D embedding space with {reduction_method}..."):
-                vocab_size = len(st.session_state.vocab)
+            with st.spinner(f"Computing PCA on vocabulary range..."):
+                # Get words from the slider range
+                words_in_range = clean_words_all[start_idx:end_idx + 1]
 
-                # Filter to only clean words
-                clean_indices = []
-                for idx in range(vocab_size):
-                    word = st.session_state.vocab[idx].strip()
-                    word_clean = word.replace('Ġ', '')
-                    if (len(word_clean) > 0 and
-                        word_clean.replace('-', '').replace("'", '').isalpha() and
-                        len(word_clean) <= 15 and
-                        not word.startswith('<') and not word.startswith('[') and
-                        not word.startswith('|')):
-                        clean_indices.append(idx)
+                # Get token indices for these words
+                range_indices = []
+                for word in words_in_range:
+                    for idx, vocab_word in st.session_state.vocab.items():
+                        if vocab_word.strip().replace('Ġ', '') == word:
+                            range_indices.append(idx)
+                            break
 
-                # Sample from clean indices
-                sample_size = min(3000, len(clean_indices))
-                np.random.seed(42)
-                sampled_indices = np.random.choice(clean_indices, sample_size, replace=False)
+                # Fit PCA only on background vocabulary
+                sampled_embeddings = st.session_state.embeddings[range_indices]
+                sampled_words = words_in_range
 
-                # Get embeddings for sampled words
-                sampled_embeddings = st.session_state.embeddings[sampled_indices]
-                sampled_words = [st.session_state.vocab[idx].strip().replace('Ġ', '') for idx in sampled_indices]
-
-                # Apply dimensionality reduction
-                if reduction_method == "PCA":
-                    reducer = PCA(n_components=2)
-                    reduced_embeddings = reducer.fit_transform(sampled_embeddings)
-                    var_explained = reducer.explained_variance_ratio_
-                else:  # t-SNE
-                    reducer = TSNE(n_components=2, random_state=42, perplexity=30)
-                    reduced_embeddings = reducer.fit_transform(sampled_embeddings)
-                    var_explained = None
+                # Apply PCA
+                reducer = PCA(n_components=2)
+                reduced_embeddings = reducer.fit_transform(sampled_embeddings)
+                var_explained = reducer.explained_variance_ratio_
 
                 # Store in session state
                 st.session_state[cache_key] = {
                     'reduced': reduced_embeddings,
                     'words': sampled_words,
-                    'indices': sampled_indices,
+                    'indices': range_indices,
                     'reducer': reducer,
                     'var_explained': var_explained
                 }
-                st.success(f"✓ Embedding space computed with {reduction_method}! ({sample_size} clean words)")
+
+                st.success(f"✓ PCA fitted on {len(range_indices)} vocabulary words!")
 
         # Get cached data
         space_data = st.session_state[cache_key]
 
-        if st.button("Visualize", key="viz_space_btn"):
-            try:
-                # Get embeddings and positions for all words
-                selected_embeddings = []
-                selected_positions = []
-                selected_words = []
+        try:
+                # --- Get embeddings and positions for all words ---
+                selected_embeddings, selected_positions, selected_words = [], [], []
 
-                for word in all_selected_words:
+                for word_idx, word in enumerate(all_selected_words):
                     try:
                         token_id = st.session_state.extractor.tokenizer.encode(word, add_special_tokens=False)[0]
                         emb = st.session_state.embeddings[token_id]
 
-                        # Project to 2D
-                        if reduction_method == "PCA":
-                            pos_2d = space_data['reducer'].transform([emb])[0]
+                        # Check if word is in background range
+                        if token_id in space_data['indices']:
+                            # Use pre-computed position
+                            pos_in_background = space_data['indices'].index(token_id)
+                            pos_2d = space_data['reduced'][pos_in_background]
                         else:
-                            # For t-SNE, find nearest neighbor in the already reduced space
-                            distances = np.linalg.norm(st.session_state.embeddings[space_data['indices']] - emb, axis=1)
-                            nearest_idx = np.argmin(distances)
-                            pos_2d = space_data['reduced'][nearest_idx]
+                            # Transform using fitted PCA
+                            pos_2d = space_data['reducer'].transform([emb])[0]
 
                         selected_embeddings.append(emb)
                         selected_positions.append(pos_2d)
                         selected_words.append(word)
-                    except:
-                        st.warning(f"Could not find word: {word}")
+                    except Exception as e:
+                        st.warning(f"Could not find word: {word} ({e})")
 
                 if len(selected_words) < 2:
                     st.error("Need at least target word + 1 comparison word")
                     raise ValueError("Not enough words")
 
-                # Create Plotly visualization
+                # --- 2D Embedding Plot ---
                 fig = go.Figure()
 
-                # Add background vocabulary
+                # Background
                 bg_x = space_data['reduced'][:, 0]
                 bg_y = space_data['reduced'][:, 1]
                 bg_words = space_data['words']
-
                 fig.add_trace(go.Scatter(
-                    x=bg_x,
-                    y=bg_y,
-                    mode='markers',
+                    x=bg_x, y=bg_y, mode='markers',
                     marker=dict(size=4, color='lightgray', opacity=0.4),
-                    text=bg_words,
-                    hovertemplate='<b>%{text}</b><extra></extra>',
-                    name='Vocabulary',
-                    showlegend=True
+                    text=bg_words, hovertemplate='<b>%{text}</b><extra></extra>',
+                    name='Vocabulary', showlegend=True
                 ))
 
-                # Add selected words
+                # Selected words
                 if len(selected_positions) > 0:
                     selected_positions = np.array(selected_positions)
 
-                    # Target word (first one)
+                    # Target word
                     fig.add_trace(go.Scatter(
-                        x=[selected_positions[0, 0]],
-                        y=[selected_positions[0, 1]],
+                        x=[selected_positions[0, 0]], y=[selected_positions[0, 1]],
                         mode='markers+text',
-                        marker=dict(size=20, color='green', symbol='star', line=dict(width=2, color='white')),
-                        text=[selected_words[0]],
-                        textposition='top center',
+                        marker=dict(size=20, color='green', symbol='star',
+                                    line=dict(width=2, color='white')),
+                        text=[selected_words[0]], textposition='top center',
                         textfont=dict(size=14, color='green', family='Arial Black'),
                         hovertemplate='<b>TARGET: %{text}</b><extra></extra>',
-                        name=f'Target: {selected_words[0]}',
-                        showlegend=True
+                        name=f'Target: {selected_words[0]}'
                     ))
 
-                    # Comparison words (rest)
+                    # Comparison words
                     if len(selected_positions) > 1:
                         fig.add_trace(go.Scatter(
-                            x=selected_positions[1:, 0],
-                            y=selected_positions[1:, 1],
+                            x=selected_positions[1:, 0], y=selected_positions[1:, 1],
                             mode='markers+text',
-                            marker=dict(size=15, color='orange', symbol='diamond', line=dict(width=2, color='white')),
-                            text=selected_words[1:],
-                            textposition='top center',
+                            marker=dict(size=15, color='orange', symbol='diamond',
+                                        line=dict(width=2, color='white')),
+                            text=selected_words[1:], textposition='top center',
                             textfont=dict(size=12, color='orange', family='Arial Black'),
                             hovertemplate='<b>%{text}</b><extra></extra>',
-                            name='Comparison words',
-                            showlegend=True
+                            name='Comparison words'
                         ))
 
-                # Update layout
+                # --- Layout ---
                 if reduction_method == "PCA" and space_data['var_explained'] is not None:
                     xaxis_title = f"PC1 ({space_data['var_explained'][0]:.1%} variance)"
                     yaxis_title = f"PC2 ({space_data['var_explained'][1]:.1%} variance)"
                 else:
-                    xaxis_title = "Dimension 1"
-                    yaxis_title = "Dimension 2"
+                    xaxis_title, yaxis_title = "Dimension 1", "Dimension 2"
 
                 fig.update_layout(
                     title=f"Embedding Space ({reduction_method})",
-                    xaxis_title=xaxis_title,
-                    yaxis_title=yaxis_title,
-                    height=700,
-                    hovermode='closest',
+                    xaxis_title=xaxis_title, yaxis_title=yaxis_title,
+                    height=700, hovermode='closest',
                     plot_bgcolor='white',
                     xaxis=dict(showgrid=True, gridcolor='lightgray', zeroline=False),
                     yaxis=dict(showgrid=True, gridcolor='lightgray', zeroline=False)
@@ -357,331 +609,62 @@ if st.session_state.extractor is not None:
 
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Similarity analysis
-                if len(selected_embeddings) > 1:
-                    st.subheader("Similarity Analysis: Which word is nearest to the target?")
-                    st.caption(f"Target word: **{selected_words[0]}** | Comparison words: {', '.join(selected_words[1:])}")
+                # --- Show actual PCA calculations with numbers ---
+                with st.expander("🔢 Actual Fitted PCA Components & Example Calculation"):
+                    pc1 = space_data['reducer'].components_[0]
+                    pc2 = space_data['reducer'].components_[1]
+                    eigenvalues = space_data['reducer'].explained_variance_
+                    mean_vec = space_data['reducer'].mean_
 
-                    # Compute ALL metrics
-                    results = {}
-                    selected_embeddings_array = np.array(selected_embeddings)
-                    from scipy.spatial.distance import cdist
+                    st.markdown(f"**Principal Component 1 (PC1)** - captures {space_data['var_explained'][0]:.2%} of variance")
+                    st.caption(f"Eigenvalue λ₁ = {eigenvalues[0]:.6f}")
+                    st.code(f"PC1 = [{', '.join([f'{v:.3f}' for v in pc1])}]")
 
-                    # Cosine Similarity
-                    results["Cosine Similarity"] = {
-                        'data': cosine_similarity(selected_embeddings),
-                        'cmap': 'YlOrRd',
-                        'vmin': 0,
-                        'vmax': 1,
-                        'note': 'higher = more similar',
-                        'format': '.3f',
-                        'higher_is_closer': True
-                    }
+                    st.markdown(f"**Principal Component 2 (PC2)** - captures {space_data['var_explained'][1]:.2%} of variance")
+                    st.caption(f"Eigenvalue λ₂ = {eigenvalues[1]:.6f}")
+                    st.code(f"PC2 = [{', '.join([f'{v:.3f}' for v in pc2])}]")
 
-                    # Euclidean Distance
-                    results["Euclidean Distance"] = {
-                        'data': euclidean_distances(selected_embeddings),
-                        'cmap': 'YlGnBu',
-                        'vmin': None,
-                        'vmax': None,
-                        'note': 'lower = more similar',
-                        'format': '.1f',
-                        'higher_is_closer': False
-                    }
+                    st.markdown("**Mean vector** (center of the vocabulary):")
+                    st.code(f"mean = [{', '.join([f'{v:.3f}' for v in mean_vec])}]")
 
-                    # Manhattan Distance
-                    manhattan = cdist(selected_embeddings_array, selected_embeddings_array, metric='cityblock')
-                    results["Manhattan Distance"] = {
-                        'data': manhattan,
-                        'cmap': 'Purples',
-                        'vmin': None,
-                        'vmax': None,
-                        'note': 'lower = more similar',
-                        'format': '.1f',
-                        'higher_is_closer': False
-                    }
+                    st.markdown("---")
+                    st.markdown("### Example: Projecting a word to 2D")
 
-                    # Dot Product
-                    dot_prod = selected_embeddings_array @ selected_embeddings_array.T
-                    results["Dot Product"] = {
-                        'data': dot_prod,
-                        'cmap': 'RdYlGn',
-                        'vmin': None,
-                        'vmax': None,
-                        'note': 'higher = more similar',
-                        'format': '.1f',
-                        'higher_is_closer': True
-                    }
+                    # Pick first word from the background for example
+                    example_idx = 0
+                    example_word = space_data['words'][example_idx]
+                    example_emb = st.session_state.embeddings[space_data['indices'][example_idx]]
+                    example_2d = space_data['reduced'][example_idx]
 
-                    # Chebyshev Distance
-                    chebyshev = cdist(selected_embeddings_array, selected_embeddings_array, metric='chebyshev')
-                    results["Chebyshev Distance"] = {
-                        'data': chebyshev,
-                        'cmap': 'Oranges',
-                        'vmin': None,
-                        'vmax': None,
-                        'note': 'lower = more similar',
-                        'format': '.2f',
-                        'higher_is_closer': False
-                    }
+                    st.markdown(f"**Word:** `{example_word}`")
+                    st.code(f"embedding = [{', '.join([f'{v:.3f}' for v in example_emb])}]")
 
-                    # Define explanations for each metric
-                    explanations = {
-                            "Cosine Similarity": {
-                                "desc": "Measures the cosine of the angle between vectors. Range [0, 1] for positive embeddings.",
-                                "note": "1 = identical direction\n0 = orthogonal\n-1 = opposite",
-                                "equation": r"\text{cosine}(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\| \|\mathbf{v}\|} = \frac{\sum_{i=1}^{n} u_i v_i}{\sqrt{\sum_{i=1}^{n} u_i^2} \sqrt{\sum_{i=1}^{n} v_i^2}}"
-                            },
-                            "Euclidean Distance": {
-                                "desc": "L2 norm - straight-line distance between points. Range [0, ∞).",
-                                "note": "Most common distance metric",
-                                "equation": r"d_{\text{Euclidean}}(\mathbf{u}, \mathbf{v}) = \|\mathbf{u} - \mathbf{v}\|_2 = \sqrt{\sum_{i=1}^{n} (u_i - v_i)^2}"
-                            },
-                            "Manhattan Distance": {
-                                "desc": "L1 norm - sum of absolute differences. Range [0, ∞).",
-                                "note": "Also called 'taxicab' or 'city block' distance",
-                                "equation": r"d_{\text{Manhattan}}(\mathbf{u}, \mathbf{v}) = \|\mathbf{u} - \mathbf{v}\|_1 = \sum_{i=1}^{n} |u_i - v_i|"
-                            },
-                            "Dot Product": {
-                                "desc": "Raw inner product without normalization. Range (-∞, ∞).",
-                                "note": "Similar to cosine but magnitude-dependent",
-                                "equation": r"\mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^{n} u_i v_i"
-                            },
-                            "Chebyshev Distance": {
-                                "desc": "L∞ norm - maximum difference along any single dimension. Range [0, ∞).",
-                                "note": "Also called 'infinity norm'",
-                                "equation": r"d_{\text{Chebyshev}}(\mathbf{u}, \mathbf{v}) = \|\mathbf{u} - \mathbf{v}\|_\infty = \max_{i=1}^{n} |u_i - v_i|"
-                            }
-                    }
+                    # Center the embedding
+                    centered = example_emb - mean_vec
+                    st.markdown("**Step 1: Center the embedding**")
+                    st.code(f"centered = embedding - mean = [{', '.join([f'{v:.3f}' for v in centered])}]")
 
-                    # Info note at the top
-                    st.info(f"⚠️ All metrics calculated in FULL {st.session_state.embeddings.shape[1]}-dimensional space (not the 2D projection)")
+                    # Project onto PC1
+                    proj1 = np.dot(centered, pc1)
+                    st.markdown("**Step 2: Project onto PC1**")
+                    st.latex(rf"x_1 = \text{{centered}} \cdot \text{{PC1}} = \sum_{{i=1}}^{{{len(centered)}}} c_i \times \text{{PC1}}_i = {proj1:.6f}")
 
-                    # Create two-column layout for each metric
-                    for metric_name, metric_info in results.items():
-                        data = metric_info['data']
+                    # Project onto PC2
+                    proj2 = np.dot(centered, pc2)
+                    st.markdown("**Step 3: Project onto PC2**")
+                    st.latex(rf"x_2 = \text{{centered}} \cdot \text{{PC2}} = \sum_{{i=1}}^{{{len(centered)}}} c_i \times \text{{PC2}}_i = {proj2:.6f}")
 
-                        # Find nearest word to target (row 0, excluding column 0 which is target itself)
-                        target_row = data[0, 1:]  # Target's distances/similarities to comparison words
-                        if metric_info['higher_is_closer']:
-                            # For similarity metrics (higher = closer)
-                            nearest_idx = np.argmax(target_row) + 1  # +1 because we excluded column 0
-                        else:
-                            # For distance metrics (lower = closer)
-                            nearest_idx = np.argmin(target_row) + 1  # +1 because we excluded column 0
+                    st.markdown("**Final 2D coordinates:**")
+                    st.latex(rf"\begin{{bmatrix}} x_1 \\ x_2 \end{{bmatrix}} = \begin{{bmatrix}} {example_2d[0]:.6f} \\ {example_2d[1]:.6f} \end{{bmatrix}}")
 
-                        nearest_word = selected_words[nearest_idx]
+                    st.success(f"✅ This is the position of '{example_word}' in the 2D plot above!")
 
-                        col_plot, col_explain = st.columns([1.2, 1])
+        except Exception as e:
+            st.error(f"Error: {e}")
+            import traceback
 
-                        # Left column: Plot
-                        with col_plot:
-                            fig_single, ax = plt.subplots(figsize=(7, 5.5))
-
-                            im = ax.imshow(data, cmap=metric_info['cmap'],
-                                         vmin=metric_info['vmin'], vmax=metric_info['vmax'])
-                            ax.set_xticks(range(len(selected_words)))
-                            ax.set_yticks(range(len(selected_words)))
-                            ax.set_xticklabels(selected_words, rotation=45, ha='right')
-                            ax.set_yticklabels(selected_words)
-                            ax.set_title(f'{metric_name}', fontsize=13, fontweight='bold')
-                            plt.colorbar(im, ax=ax)
-
-                            # Annotate cells with values
-                            for i in range(len(selected_words)):
-                                for j in range(len(selected_words)):
-                                    # Highlight the nearest word to target
-                                    if i == 0 and j == nearest_idx:
-                                        # This is the nearest word!
-                                        bbox_props = dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8, edgecolor='red', linewidth=3)
-                                        fontweight = 'bold'
-                                        fontsize = 11
-                                    else:
-                                        bbox_props = None
-                                        fontweight = 'normal'
-                                        fontsize = 10
-
-                                    ax.text(j, i, format(data[i, j], metric_info['format']),
-                                           ha="center", va="center", color="black",
-                                           fontsize=fontsize, fontweight=fontweight,
-                                           bbox=bbox_props)
-
-                            plt.tight_layout()
-                            st.pyplot(fig_single)
-
-                            # Show which word is nearest
-                            st.success(f"🎯 Nearest to **{selected_words[0]}**: **{nearest_word}**")
-
-                        # Right column: Explanation
-                        with col_explain:
-                            if metric_name in explanations:
-                                exp = explanations[metric_name]
-                                st.markdown(f"### {metric_name}")
-                                st.markdown(f"**{exp['desc']}**")
-                                st.markdown(f"*{exp['note']}*")
-                                st.markdown("**Formula:**")
-                                st.latex(exp['equation'])
-                                st.caption(f"where n = {st.session_state.embeddings.shape[1]}")
-
-                        st.markdown("---")  # Separator between metrics
-
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
-
-    # ========================================
-    # TAB 2: LAYER EVOLUTION
-    # ========================================
-    with tab2:
-        st.header("Layer Evolution: How Distances Change Through the Model")
-        st.markdown("""
-        Write a prompt containing your selected words and see how their similarities evolve
-        as the prompt passes through each transformer layer.
-        """)
-
-        prompt_text = st.text_area(
-            "Enter a prompt (should contain your selected words)",
-            value="The princess went to the wedding but saw a murder.",
-            height=100,
-            help="The prompt should ideally contain the words you selected above"
-        )
-
-        if st.button("Analyze Layer Evolution", key="layer_evolution_btn"):
-            with st.spinner("Extracting representations from all layers..."):
-                try:
-                    # Extract activations from all layers
-                    result = st.session_state.extractor.extract_activations(prompt_text)
-                    tokens = result['tokens']
-                    hidden_states = result['hidden_states']
-                    n_layers = len(hidden_states) - 1  # Exclude embedding layer
-
-                    st.success(f"✓ Extracted {n_layers} layers!")
-
-                    # Find token positions for selected words
-                    word_positions = {}
-                    for word in all_selected_words:
-                        # Clean the word for comparison
-                        word_clean = word.strip().lower()
-
-                        # Search through tokens by string matching
-                        for i, token in enumerate(tokens):
-                            # Remove GPT-2 space marker and clean
-                            token_clean = token.replace('Ġ', '').strip().lower()
-
-                            # Check if the word matches the token
-                            if word_clean == token_clean or word_clean in token_clean or token_clean in word_clean:
-                                word_positions[word] = i
-                                break
-
-                    if len(word_positions) < len(all_selected_words):
-                        missing = set(all_selected_words) - set(word_positions.keys())
-                        st.warning(f"⚠️ Could not find these words in the prompt: {', '.join(missing)}")
-                        st.info("The selected words should appear in the prompt for best results.")
-
-                    if len(word_positions) >= 2:
-                        st.subheader(f"Found words: {', '.join(word_positions.keys())}")
-                        st.caption(f"Prompt tokens: {' '.join(tokens)}")
-
-                        # Calculate all metrics across all layers
-                        from scipy.spatial.distance import cdist
-
-                        layers_data = {}
-                        for layer_idx in range(n_layers + 1):  # +1 to include embedding layer
-                            # Extract embeddings for this layer
-                            layer_embeddings = []
-                            layer_words = []
-
-                            for word, pos in word_positions.items():
-                                emb = hidden_states[layer_idx][0, pos, :].cpu().numpy()
-                                layer_embeddings.append(emb)
-                                layer_words.append(word)
-
-                            if len(layer_embeddings) >= 2:
-                                emb_array = np.array(layer_embeddings)
-
-                                # Calculate all metrics
-                                cos_sim = cosine_similarity(emb_array)
-                                euc_dist = euclidean_distances(emb_array)
-                                manhattan = cdist(emb_array, emb_array, metric='cityblock')
-                                dot_prod = emb_array @ emb_array.T
-                                chebyshev = cdist(emb_array, emb_array, metric='chebyshev')
-
-                                layers_data[layer_idx] = {
-                                    'words': layer_words,
-                                    'Cosine Similarity': cos_sim,
-                                    'Euclidean Distance': euc_dist,
-                                    'Manhattan Distance': manhattan,
-                                    'Dot Product': dot_prod,
-                                    'Chebyshev Distance': chebyshev
-                                }
-
-                        # Plot evolution for each metric
-                        st.info(f"⚠️ Tracking similarities in FULL {st.session_state.embeddings.shape[1]}-D hidden states across {n_layers + 1} layers")
-
-                        # For each metric, show how distance between target and each comparison word evolves
-                        target_word_idx = 0  # First word is target
-
-                        metrics_info = {
-                            'Cosine Similarity': {'higher_is_closer': True, 'color': 'green'},
-                            'Euclidean Distance': {'higher_is_closer': False, 'color': 'blue'},
-                            'Manhattan Distance': {'higher_is_closer': False, 'color': 'purple'},
-                            'Dot Product': {'higher_is_closer': True, 'color': 'red'},
-                            'Chebyshev Distance': {'higher_is_closer': False, 'color': 'orange'}
-                        }
-
-                        for metric_name, metric_settings in metrics_info.items():
-                            st.subheader(f"{metric_name} Evolution")
-
-                            fig, ax = plt.subplots(figsize=(12, 6))
-
-                            # For each comparison word, plot its distance to target across layers
-                            for comp_idx in range(1, len(layer_words)):
-                                comp_word = layer_words[comp_idx]
-                                values = []
-
-                                for layer_idx in sorted(layers_data.keys()):
-                                    data_matrix = layers_data[layer_idx][metric_name]
-                                    value = data_matrix[target_word_idx, comp_idx]
-                                    values.append(value)
-
-                                ax.plot(sorted(layers_data.keys()), values, marker='o',
-                                       label=f'{layer_words[0]} ↔ {comp_word}', linewidth=2, markersize=8)
-
-                            ax.set_xlabel('Layer', fontsize=12)
-                            ax.set_ylabel(metric_name, fontsize=12)
-                            ax.set_title(f'How {metric_name} Changes Across Layers', fontsize=14, fontweight='bold')
-                            ax.legend(loc='best')
-                            ax.grid(True, alpha=0.3)
-                            ax.set_xticks(range(n_layers + 1))
-                            ax.set_xticklabels(['Emb'] + [f'L{i}' for i in range(1, n_layers + 1)])
-
-                            # Add annotation for what the metric means
-                            if metric_settings['higher_is_closer']:
-                                ax.text(0.02, 0.98, '↑ Higher = More Similar',
-                                       transform=ax.transAxes, fontsize=10,
-                                       verticalalignment='top',
-                                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-                            else:
-                                ax.text(0.02, 0.98, '↓ Lower = More Similar',
-                                       transform=ax.transAxes, fontsize=10,
-                                       verticalalignment='top',
-                                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
-                            plt.tight_layout()
-                            st.pyplot(fig)
-
-                    else:
-                        st.error("Need at least 2 words found in the prompt to analyze!")
-
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
+            st.code(traceback.format_exc())
 
 else:
     st.info("👈 Loading model...")
 
-# Footer
-st.markdown("---")
-st.markdown("*Built with Streamlit • TinyStories-8M • Explore the geometry of language*")
