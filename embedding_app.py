@@ -23,7 +23,7 @@ if 'vocab' not in st.session_state:
 
 # Main title
 st.title("Once upon a time...")
-st.title("...there was a kingdom of 256-dimensional embeddings, home to 50 257 tokens.")
+st.title("...there was a kingdom of 256-dimensional embeddings, home to 50,257 tokens.")
 st.markdown("See them, and lose your words.")
 st.markdown("*Model: TinyStories-8M*")
 
