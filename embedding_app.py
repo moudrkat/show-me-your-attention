@@ -22,8 +22,10 @@ if 'vocab' not in st.session_state:
     st.session_state.vocab = None
 
 # Main title
-st.title("🔮 ...you will finally see 256-dimensional embeddings and lose your words.")
-st.markdown("*Explore TinyStories-8M word embeddings*")
+st.title("Once upon a time...")
+st.title("...there was a kingdom of 256-dimensional embeddings, home to 50 257 tokens.")
+st.markdown("See them, and lose your words.")
+st.markdown("*Model: TinyStories-8M *")
 
 # Load model automatically on first run
 if st.session_state.extractor is None:
@@ -46,6 +48,20 @@ if st.session_state.extractor is None:
 
 # Only show content if model is loaded
 if st.session_state.extractor is not None:
+
+    # How to use expander
+    with st.expander("📚 How to Use This App"):
+        st.markdown("""
+        ### Welcome to the Embedding Explorer!
+
+        This app lets you visualize and compare word embeddings from the TinyStories-8M language model.
+
+        **Quick Start:**
+        1. **Select Words**: Choose a target word and comparison words to analyze
+        2. **View Embeddings**: See the raw 256-dimensional vectors for each word
+        3. **Compare Similarities**: Examine different distance metrics between words
+        4. **Explore Visualizations**: Use the tabs to explore embedding space and matrix heatmaps
+        """)
 
     # Word selection (above tabs)
     st.subheader("Select Words to Analyze")
