@@ -1,6 +1,40 @@
 # Show Me Your Attention
 
+> **Note:** This repo has evolved! It now contains multiple visualization projects including the original attention visualizer AND a new embedding exploration app. Things might be a bit messy as I add more experiments. Feel free to explore and dig around!
+
 A Python project for visualizing neuron activations and attention patterns from transformer-based language models. Load tiny LLMs from HuggingFace and explore how different prompt phrasings affect internal model representations.
+
+## What's in This Repo?
+
+This repository now includes several interactive Streamlit apps for exploring language models:
+
+### 1. Attention Pattern Visualizer (`app.py`)
+Generate text and watch attention patterns unfold in real-time! See how each generated token attends to all previous tokens.
+
+```bash
+streamlit run app.py
+```
+
+### 2. Sampling Parameters Explorer (`sampling_app.py`)
+Visualize how temperature, top-k, and top-p affect text generation probability distributions. Great for understanding how sampling works!
+
+```bash
+streamlit run sampling_app.py
+```
+
+### 3. Embedding Explorer (`embedding_app.py`)
+Interactive exploration of 256-dimensional word embeddings:
+- 5 different distance metrics (cosine similarity, euclidean, manhattan, dot product, Chebyshev)
+- PCA dimensionality reduction with step-by-step mathematical explanations
+- Embedding matrix heatmaps
+- Full numerical calculations showing the math behind everything
+
+```bash
+streamlit run embedding_app.py
+```
+
+### 4. Original CLI Examples
+The `examples/` folder has the original attention visualization scripts for comparing different prompt phrasings (see below for details).
 
 ## Features
 
