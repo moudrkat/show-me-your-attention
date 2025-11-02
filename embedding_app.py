@@ -25,7 +25,7 @@ if 'vocab' not in st.session_state:
 st.title("Once upon a time...")
 st.title("...there was a kingdom of 256-dimensional embeddings, home to 50 257 tokens.")
 st.markdown("See them, and lose your words.")
-st.markdown("*Model: TinyStories-8M *")
+st.markdown("*Model: TinyStories-8M*")
 
 # Load model automatically on first run
 if st.session_state.extractor is None:
@@ -482,16 +482,6 @@ if st.session_state.extractor is not None:
             st.markdown(r"The fraction of total variance captured by PC$i$:")
             st.latex(r"\text{Var. Explained}_i = \frac{\lambda_i}{\sum_{j=1}^{d} \lambda_j}")
             st.markdown("Higher percentages mean the 2D visualization preserves more information from the original high-dimensional space")
-
-            st.markdown("---")
-            st.markdown("#### Key Properties")
-            st.markdown("""
-            - **Linear transformation:** Can project new points without refitting
-            - **Orthogonal components:** PC1 ⊥ PC2 (uncorrelated)
-            - **Deterministic:** Same data → same result every time
-            - **Global structure:** Preserves large-scale relationships
-            - **Optimal reconstruction:** Minimizes squared reconstruction error
-            """)
 
         # Use PCA only
         reduction_method = "PCA"
