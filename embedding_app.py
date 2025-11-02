@@ -22,7 +22,7 @@ if 'vocab' not in st.session_state:
     st.session_state.vocab = None
 
 # Main title
-st.title("🔮 ...Once upon a time, finally see 256-dimensional embeddings and lose your words.")
+st.title("🔮 ...you will finally see 256-dimensional embeddings and lose your words.")
 st.markdown("*Explore TinyStories-8M word embeddings*")
 
 # Load model automatically on first run
@@ -447,7 +447,7 @@ if st.session_state.extractor is not None:
             st.markdown("---")
             st.markdown("#### Step 1: Center the Data")
             st.latex(r"\bar{\mathbf{X}} = \mathbf{X} - \frac{1}{n}\sum_{i=1}^{n} \mathbf{x}_i")
-            st.markdown(r"Subtract the mean to center data at the origin")
+            st.markdown(r"Subtract the mean to center data at the origin. Note: We don't standardize (divide by std dev) because embedding dimensions already have similar scales.")
 
             st.markdown("#### Step 2: Compute Covariance Matrix")
             st.latex(r"\mathbf{\Sigma} = \frac{1}{n-1} \bar{\mathbf{X}}^T \bar{\mathbf{X}}")
@@ -630,13 +630,20 @@ if st.session_state.extractor is not None:
                     st.markdown("---")
                     st.markdown("### Example: Projecting a word to 2D")
 
-                    # Pick first word from the background for example
-                    example_idx = 0
-                    example_word = space_data['words'][example_idx]
-                    example_emb = st.session_state.embeddings[space_data['indices'][example_idx]]
-                    example_2d = space_data['reduced'][example_idx]
+                    # Use the target word for the example
+                    example_word = selected_words[0]
+                    example_emb = selected_embeddings[0]
+                    example_2d = selected_positions[0]
 
-                    st.markdown(f"**Word:** `{example_word}`")
+                    # Check if this word was part of PCA fitting or just projected
+                    target_token_id = st.session_state.extractor.tokenizer.encode(example_word, add_special_tokens=False)[0]
+                    was_in_fitting = target_token_id in space_data['indices']
+
+                    if was_in_fitting:
+                        st.markdown(f"**Word:** `{example_word}` (target) - ✓ was included in PCA fitting")
+                    else:
+                        st.markdown(f"**Word:** `{example_word}` (target) - ⚠️ **projected** onto pre-fitted PCA (not part of original fitting)")
+                        st.caption("This word was not in the vocabulary range used to fit PCA, so we're using the learned components to project it.")
                     st.code(f"embedding = [{', '.join([f'{v:.3f}' for v in example_emb])}]")
 
                     # Center the embedding
@@ -655,9 +662,13 @@ if st.session_state.extractor is not None:
                     st.latex(rf"x_2 = \text{{centered}} \cdot \text{{PC2}} = \sum_{{i=1}}^{{{len(centered)}}} c_i \times \text{{PC2}}_i = {proj2:.6f}")
 
                     st.markdown("**Final 2D coordinates:**")
-                    st.latex(rf"\begin{{bmatrix}} x_1 \\ x_2 \end{{bmatrix}} = \begin{{bmatrix}} {example_2d[0]:.6f} \\ {example_2d[1]:.6f} \end{{bmatrix}}")
+                    st.latex(rf"\begin{{bmatrix}} x_1 \\ x_2 \end{{bmatrix}} = \begin{{bmatrix}} {proj1:.6f} \\ {proj2:.6f} \end{{bmatrix}}")
 
-                    st.success(f"✅ This is the position of '{example_word}' in the 2D plot above!")
+                    # Verify the calculation matches
+                    if np.allclose([proj1, proj2], example_2d):
+                        st.success(f"✅ Verified! This matches the position of '{example_word}' in the 2D plot above!")
+                    else:
+                        st.error(f"⚠️ Calculation mismatch: manual=({proj1:.6f}, {proj2:.6f}) vs actual=({example_2d[0]:.6f}, {example_2d[1]:.6f})")
 
         except Exception as e:
             st.error(f"Error: {e}")
