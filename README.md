@@ -2,7 +2,11 @@
 
 > **Note:** This repo has evolved! It now contains multiple visualization projects including the original attention visualizer AND a new embedding exploration app. Things might be a bit messy as I add more experiments. Feel free to explore and dig around!
 
-A Python project for visualizing neuron activations and attention patterns from transformer-based language models. Load tiny LLMs from HuggingFace and explore how different prompt phrasings affect internal model representations.
+A Python project for visualizing neuron activations and attention patterns from transformer-based language models. Load tiny LLMs from HuggingFace and explore how different prompt phrasings affect internal model representations. Under the hood, a small library (`src/`) loads the model, captures attention weights and activations from every layer and head, and renders the heatmaps and interactive Plotly views the apps use.
+
+![how much attention the model pays to the word 'unicorn' across layers, per phrasing: a plain ask keeps it high; IMPORTANT and URGENT!!! prefixes collapse it](outputs/emphasis_attention_heatmap.png)
+
+*One picture of why phrasing matters: ask plainly and the model attends to your target word — shout "URGENT!!!" at it and the attention collapses to the shouting instead.*
 
 ## What's in This Repo?
 
@@ -36,24 +40,12 @@ streamlit run embedding_app.py
 ### 4. Original CLI Examples
 The `examples/` folder has the original attention visualization scripts for comparing different prompt phrasings (see below for details).
 
-## Features
-
-- **Model Loading**: Easy loading of small LLMs from HuggingFace Hub
-- **Attention Extraction**: Capture attention weights from all layers and heads
-- **Neuron Activations**: Extract and analyze hidden state activations
-- **Rich Visualizations**: Multiple visualization types including:
-  - Attention heatmaps (single head or all heads)
-  - Neuron activation patterns
-  - Interactive Plotly visualizations
-  - Cross-prompt comparisons
-  - Layer-wise statistics
-
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd show_me_your_attention
+git clone https://github.com/moudrkat/show-me-your-attention.git
+cd show-me-your-attention
 ```
 
 2. Create and activate a virtual environment:
@@ -121,15 +113,17 @@ python examples/compare_phrasings.py --mode custom \
 
 ```
 show_me_your_attention/
-├── src/
-│   ├── __init__.py
-│   ├── model_loader.py      # Model loading and activation extraction
-│   └── visualizer.py         # Visualization tools
-├── examples/
-│   └── compare_phrasings.py  # Example comparison scripts
-├── outputs/                  # Generated visualizations (auto-created)
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
+├── app.py                    # attention pattern visualizer (Streamlit)
+├── sampling_app.py           # sampling parameters explorer
+├── embedding_app.py          # embedding explorer
+├── src/                      # model loading, attention/activation capture,
+│                             # visualization tools
+├── examples/                 # original CLI comparison scripts
+├── config/, data/            # app config and sample data
+├── finetune_starwars.py      # finetuning track (see FINETUNING.md)
+├── outputs/                  # generated visualizations
+├── requirements.txt          # deps (requirements-training.txt for training)
+└── README.md                 # this file
 ```
 
 ## Available Models
@@ -283,9 +277,9 @@ If you use this tool in your research, please cite:
 ```bibtex
 @software{show_me_your_attention,
   title={Show Me Your Attention: Visualizing LLM Attention Patterns},
-  author={Your Name},
-  year={2024},
-  url={https://github.com/yourusername/show_me_your_attention}
+  author={Fajmanov\'a, Kate\v{r}ina},
+  year={2025},
+  url={https://github.com/moudrkat/show-me-your-attention}
 }
 ```
 
