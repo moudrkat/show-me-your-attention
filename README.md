@@ -13,20 +13,32 @@ A Python project for visualizing neuron activations and attention patterns from 
 This repository now includes several interactive Streamlit apps for exploring language models:
 
 ### 1. Attention Pattern Visualizer (`app.py`)
+**Live: [show-me-your-attention.streamlit.app](https://show-me-your-attention.streamlit.app)**
+
 Generate text and watch attention patterns unfold in real-time! See how each generated token attends to all previous tokens.
+
+![the attention visualizer live](media/show-me-your-attention.png)
 
 ```bash
 streamlit run app.py
 ```
 
 ### 2. Sampling Parameters Explorer (`sampling_app.py`)
+**Live: [sample-me-softly-with-this-prompt.streamlit.app](https://sample-me-softly-with-this-prompt.streamlit.app)**
+
 Visualize how temperature, top-k, and top-p affect text generation probability distributions. Great for understanding how sampling works!
+
+![the sampling explorer live](media/sample-me-softly-with-this-prompt.png)
 
 ```bash
 streamlit run sampling_app.py
 ```
 
 ### 3. Embedding Explorer (`embedding_app.py`)
+**Live: [once-upon-256-dim.streamlit.app](https://once-upon-256-dim.streamlit.app)**
+
+![the embedding explorer live](media/once-upon-256-dim.png)
+
 Interactive exploration of 256-dimensional word embeddings:
 - 5 different distance metrics (cosine similarity, euclidean, manhattan, dot product, Chebyshev)
 - PCA dimensionality reduction with step-by-step mathematical explanations
