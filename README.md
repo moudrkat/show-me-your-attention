@@ -40,6 +40,10 @@ streamlit run embedding_app.py
 ### 4. Original CLI Examples
 The `examples/` folder has the original attention visualization scripts for comparing different prompt phrasings (see below for details).
 
+The three apps above are the living part of the repo. Everything else at the
+root — `test_*.py`, `debug_*.py`, `*.backup`, `fix_app.py` — is experiment
+debris from getting them there, kept honestly in place.
+
 ## Installation
 
 1. Clone the repository:
